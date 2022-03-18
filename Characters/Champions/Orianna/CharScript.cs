@@ -26,8 +26,7 @@ namespace CharScripts
             _spell = spell;
             ApiEventManager.OnDeath.AddListener(owner, owner, OnDeath, false);
             AddBuff("ClockworkWinding", 1f, 1, spell, owner, owner, true);
-            BallHandler = AddBuff("OriannaBallHandler", 1.0f, 1, spell, owner, owner, true);
-
+            AddBuff("OriannaBallHandler", 1.0f, 1, spell, owner, owner, true);
             ApiEventManager.OnHitUnit.AddListener(this, _owner, TargetExecute, false);
         }
 
@@ -55,10 +54,6 @@ namespace CharScripts
 
         public void OnUpdate(float diff)
         {
-            if(GetUnitsInRange(_owner.Position,135f,true).Contains((BallHandler.BuffScript as Buffs.OriannaBallHandler).GetBall()))
-            {
-                SpellCast(_owner, 4, SpellSlotType.ExtraSlots, false, (BallHandler.BuffScript as Buffs.OriannaBallHandler).GetBall(), Vector2.Zero);
-            }
         }
     }
 

@@ -10,7 +10,7 @@ using LeagueSandbox.GameServer.Scripting.CSharp;
 using System;
 namespace Buffs
 {
-    class TheBall : IBuffGameScript
+    class OrianaRedactShield : IBuffGameScript
     {
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
@@ -24,35 +24,13 @@ namespace Buffs
             
         };
 
-        IParticle _bind;
-        IParticle _ring;
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            var spellLevel = ownerSpell.CastInfo.SpellLevel - 1;
-            var bonusResistances = new[] { 6, 12, 18, 24, 30 }[spellLevel];
-            StatsModifier.Armor.FlatBonus = bonusResistances;
-            StatsModifier.MagicResist.FlatBonus = bonusResistances;
-            unit.AddStatModifier(StatsModifier);
-
-            if (unit.NetId == ownerSpell.CastInfo.Owner.NetId)
-            {
-                _bind = null;
-                _ring = null;
-            }
-            else 
-            {
-                _bind = AddParticleTarget(ownerSpell.CastInfo.Owner, unit, "Oriana_Ghost_bind", unit, 2300f, flags: FXFlags.TargetDirection);
-                _ring = AddParticleTarget(ownerSpell.CastInfo.Owner, unit, "OriannaEAllyRangeRing", unit, 2300f, flags: FXFlags.TargetDirection,teamOnly: ownerSpell.CastInfo.Owner.Team);
-            }
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            if(_bind != null)
-            {
-                _bind.SetToRemove();
-                _ring.SetToRemove();
-            }
+
         }
 
         public void OnPreAttack(ISpell spell)

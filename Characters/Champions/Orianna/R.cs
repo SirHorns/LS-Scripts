@@ -15,6 +15,7 @@ namespace Spells
     {
         public ISpellScriptMetadata ScriptMetadata { get; private set; } = new SpellScriptMetadata()
         {
+            TriggersSpellCasts = true,
         };
 
         public void OnActivate(IObjAiBase owner, ISpell spell)
@@ -27,6 +28,11 @@ namespace Spells
 
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
+            AddParticleTarget(owner, owner, "OrianaDissonance_cas.troy", owner, 5f);
+            //AddParticleTarget(owner, owner, "OrianaVacuumIndicator.troy", owner, 5f);
+            //AddParticleTarget(owner, owner, "OrianaVacuumIndicator_ally.troy", owner, 5f);
+            //AddParticleTarget(owner, owner, "OrianaVacuumIndicatorSelfNoRing.troy", owner, 5f);
+            //AddParticleTarget(owner, owner, "OrianaVacuumIndicatorSelfRing.troy", owner, 5f);
         }
 
         public void OnSpellCast(ISpell spell)

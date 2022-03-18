@@ -24,12 +24,10 @@ namespace Spells
         };
 
         IObjAiBase _owner;
-        IBuff BallHandlerBuff;
-        IMinion oriannaBall = null;
+        Buffs.OriannaBallHandler BallHandler;
         public void OnActivate(IObjAiBase owner, ISpell spell)
         {
             _owner = owner;
-            
         }
 
         public void OnDeactivate(IObjAiBase owner, ISpell spell)
@@ -38,31 +36,26 @@ namespace Spells
 
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
-            BallHandlerBuff = owner.GetBuffWithName("OriannaBallHandler");
+            BallHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
         }
         
         public void OnSpellCast(ISpell spell)
         {
             var targetPosition = new Vector2(spell.CastInfo.TargetPosition.X, spell.CastInfo.TargetPosition.Z);
 
-            oriannaBall = (BallHandlerBuff.BuffScript as Buffs.OriannaBallHandler).GetBall();
-
-            if (oriannaBall != null)
+            if (BallHandler.GetIsAttachedtoChampion())
             {
-                SpellCast(spell.CastInfo.Owner, 0, SpellSlotType.ExtraSlots, targetPosition, targetPosition, false, oriannaBall.Position);
+                SpellCast(spell.CastInfo.Owner, 0, SpellSlotType.ExtraSlots, targetPosition, targetPosition, false, BallHandler.GetAttachedChampion().Position);
             }
-            else
+            else 
             {
-                SpellCast(spell.CastInfo.Owner, 0, SpellSlotType.ExtraSlots, targetPosition, targetPosition, false, _owner.Position); 
+                SpellCast(spell.CastInfo.Owner, 0, SpellSlotType.ExtraSlots, targetPosition, targetPosition, false, BallHandler.GetBall().Position);
             }
 
-            /*
-            if (HasBall || _owner.Model == "Orianna")
+            if (_owner.Model == "Orianna")
             {
                 _owner.ChangeModel("OriannaNoBall");
-                HasBall = false;
             }
-            */
 
             _owner.PlayAnimation("Spell1", 1f, 0, 0);
         }
@@ -101,11 +94,11 @@ namespace Spells
         };
 
         IObjAiBase _owner;
-        IBuff BallHandlerBuff = null;
-        IMinion oriannaBall = null;
+        Buffs.OriannaBallHandler BallHandler;
         public void OnActivate(IObjAiBase owner, ISpell spell)
         {
             _owner = owner;
+            BallHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
             ApiEventManager.OnSpellHit.AddListener(this, spell, TargetExecute, false);
         }
 
@@ -117,15 +110,16 @@ namespace Spells
         Vector2 targetPosition;
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
-            BallHandlerBuff = owner.GetBuffWithName("OriannaBallHandler");
-
-            oriannaBall = (BallHandlerBuff.BuffScript as Buffs.OriannaBallHandler).GetBall();
-
             targetPosition = end;
 
-            if(oriannaBall != null)
+            if(BallHandler.GetIsBallActive())
             {
-                (BallHandlerBuff.BuffScript as Buffs.OriannaBallHandler).ToggleBallRender(false); 
+                BallHandler.SetBallRender(false);
+            }
+            
+            if(BallHandler.GetAttachedChampion() != null)
+            {
+                BallHandler.GetAttachedChampion().RemoveBuffsWithName("TheBall");
             }
 
             var missile = spell.CreateSpellMissile(new MissileParameters
@@ -135,7 +129,6 @@ namespace Spells
             });
 
             ApiEventManager.OnSpellMissileEnd.AddListener(this, missile, OnMissileFinish, true);
-
 
             AbilityStateDisableCheck();
         }
@@ -160,16 +153,22 @@ namespace Spells
 
         public void OnMissileFinish(ISpellMissile missile) 
         {
-            if (oriannaBall == null)
+            if (BallHandler.GetBall() == null)
             {
-                oriannaBall = (BallHandlerBuff.BuffScript as Buffs.OriannaBallHandler).SpawnBall(targetPosition);
+                BallHandler.SpawnBall(targetPosition);
             }
-            else
+            else 
             {
+                BallHandler.MoveBall(targetPosition);
+            }
 
-                (BallHandlerBuff.BuffScript as Buffs.OriannaBallHandler).MoveBall(targetPosition);
-                (BallHandlerBuff.BuffScript as Buffs.OriannaBallHandler).ToggleBallRender(true);
-            }
+            //BallHandler.SetBallRender(true);
+
+            //BallHandler.SetBallState(true);
+
+            IChampion tmp = null;
+            BallHandler.SetAttachedChampion(tmp);
+            BallHandler.SetIsAttachedtoChampion(false);
 
             EnableAbilities();
         }
