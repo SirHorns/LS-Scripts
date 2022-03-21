@@ -7,9 +7,12 @@ I modified the folder structure compared to the way it is within the default Lea
 * LeagueSandbox-Scripts
   * Buffs
     * Champions
-      * [Individual Champion Folders]
+      * Individual Champion Folders
   * Characters
     *  Champions
-       *  [Individual Champion Folders]
+       *  Individual Champion Folders
     *  Pets
-       *  [Individual ChampionPet Folders]
+       *  Individual ChampionPet Folders
+
+**Champion Progress:**
+* Orianna - Incomplete
