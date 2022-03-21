@@ -8,6 +8,19 @@ using LeagueSandbox.GameServer.GameObjects.Stats;
 using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 using System;
+
+//*=========================================
+/*
+ * ValkyrieHorns
+ * Lastupdated: 3/20/2022
+ * 
+ * TODOS:
+ * 
+ * Known Issues:
+ * Waiting for shields to be implemented in LeagueSandbox Gameserver.
+*/
+//*========================================
+
 namespace Buffs
 {
     class OrianaRedactShield : IBuffGameScript
@@ -20,11 +33,16 @@ namespace Buffs
         };
 
         public IStatsModifier StatsModifier { get; private set; } = new StatsModifier ()
-        {//TODO: Wait for shield implementation.
+        {
         };
 
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
+            var spellLevel = ownerSpell.CastInfo.SpellLevel - 1;
+            var shieldBase = new[] { 80, 120, 160, 200, 240 }[spellLevel];
+            var finalShield = shieldBase + (.4f * ownerSpell.CastInfo.Owner.Stats.AbilityPower.Total);
+
+            //Shield target for finalShieldAmmount value
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)

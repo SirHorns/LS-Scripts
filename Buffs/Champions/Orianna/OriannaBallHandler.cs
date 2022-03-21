@@ -9,6 +9,22 @@ using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 
 using System;
+using GameServerCore.Domain;
+
+//*=========================================
+/*
+ * ValkyrieHorns
+ * Lastupdated: 3/20/2022
+ * 
+ * TODOS:
+ * Clean and reorganize code more.
+ * 
+ * Known Issues:
+ * Due to how intergated this script is on the overall functioning of Orianna it will crash League if you Reloadscripts or use Hotreload. 
+ * Using an ability will crash the game as Buffs aren't reloaded properly and this will throw a bunch of null errors even if the script is technially applied
+ * to Orianna still.
+*/
+//*=========================================
 
 namespace Buffs
 {
@@ -23,7 +39,7 @@ namespace Buffs
 
         public IStatsModifier StatsModifier { get; private set; } = new StatsModifier ();
 
-        private IObjAiBase _owner;
+        private IObjAiBase _orianna;
         private ISpell _spell;
         private IBuff _buff;
         private OriannaBall _ballBuff;
@@ -39,9 +55,15 @@ namespace Buffs
 
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            _owner = (IObjAiBase) unit;
+            _orianna = (IObjAiBase) unit;
             _spell = ownerSpell;
             _buff = buff;
+            ApiEventManager.OnDeath.AddListener(this, unit, OnDeath, false);
+        }
+
+        private void OnDeath(IDeathData obj)
+        {
+            DisableBall();
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
@@ -63,6 +85,14 @@ namespace Buffs
         /// <returns>If ball is is in flight.</returns>
         public bool SetFlightState(bool IsInFlight)
         {
+            if(IsInFlight)
+            {
+                SetAttachedState(false);
+                SetAttachedChampion(null);
+                SetRenderState(false);
+            }
+
+            this.IsInFlight = IsInFlight;
             return this.IsInFlight;
         }
 
@@ -174,12 +204,31 @@ namespace Buffs
         {
             //var spellPos = new Vector2(position.X, position.Y);
             //OriannaBall = AddMinion(_owner, "OriannaBall", "OriannaBall" + _owner.Team, position, _owner.Team, _owner.SkinID, true, false,SpellDataFlags.NonTargetableAll,visibilityOwner: null,true);
-            _ball = AddMinion(_owner, "OriannaBall", "OriannaBall" + _owner.Team, position, _owner.Team, _owner.SkinID, true, false);
+            _ball = AddMinion(_orianna, "OriannaBall", "OriannaBall" + _orianna.Team, position, _orianna.Team, _orianna.SkinID, true, false);
             _ball.FaceDirection(new Vector3(position.X, 0, position.Y));
-            _ballBuff = AddBuff("OriannaBall", 2300.0f, 1, _spell, _ball, _owner).BuffScript as OriannaBall;
+            _ballBuff = AddBuff("OriannaBall", 2300.0f, 1, _spell, _ball, _orianna).BuffScript as OriannaBall;
             SetRenderState(renderState);
 
             return _ball;
+        }
+
+        /// <summary>
+        /// Places the ball at currently attached targets location. Used for on AttachedChampions death or if they become untargetable.
+        /// </summary>
+        /// <param name="newPosition">New position to place Orianna Ball at.</param>
+        /// <param name="activateBall">Usually enabled for Q. Sets Ball to active configuration.</param>
+        /// <returns>The new position of the ball.</returns>
+        public Vector2 DropBall()
+        {
+            _ball.TeleportTo(GetAttachedChampion().Position.X, GetAttachedChampion().Position.Y);
+            var droppedPosition = new Vector2(GetAttachedChampion().Position.X, GetAttachedChampion().Position.Y);
+
+            SetRenderState(true);
+            SetGroundedState(true);
+            SetAttachedChampion(null);
+            SetAttachedState(false);
+
+            return droppedPosition;
         }
 
         /// <summary>
@@ -188,11 +237,11 @@ namespace Buffs
         /// <param name="newPosition">New position to move Orianna Ball to.</param>
         /// <param name="activateBall">Usually enabled for Q. Sets Ball to active configuration.</param>
         /// <returns>The new position of the ball.</returns>
-        public Vector2 MoveBall(Vector2 newPosition,bool activateBall = false)
+        public Vector2 MoveBall(Vector2 newPosition, bool activateBall = false)
         {
             _ball.TeleportTo(newPosition.X, newPosition.Y);
 
-            if(activateBall)
+            if (activateBall)
             {
                 SetRenderState(true);
                 SetGroundedState(true);
@@ -218,22 +267,21 @@ namespace Buffs
         /// <param name="attachToChamp">If the ball should be attached to a new champ, defaults to Orianna if false</param>
         /// <param name="champion">Champion to attach ball to once it is disabled.</param>
         /// TODO: Possible better way to handle this rather than Active/Deactive locking other methods. Would prefer to not constantly destory and remake a ball instance if possible.
+        /// TODO: THink of better name for this method.
         public void DisableBall(bool attachToChamp = false, IChampion champion = null)
         {
             SetRenderState(false);
             SetAttachedState(true);
             SetGroundedState(false);
-
+            SetFlightState(false);
 
             if (attachToChamp)
             {
                 SetAttachedChampion(champion);
-                SetAttachedState(true);
             }
             else
             {
-                SetAttachedChampion((IChampion)_owner);
-                SetAttachedState(true);
+                SetAttachedChampion(_orianna as IChampion);
             }
 
             //theBall.TakeDamage(theBall.Owner, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
@@ -244,7 +292,7 @@ namespace Buffs
         /// </summary>
         public void ReturnBall() 
         {
-            SpellCast(_owner, 4, SpellSlotType.ExtraSlots, false, _ball, Vector2.Zero);
+            SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, false, _ball, Vector2.Zero);
         }
 
         /// <summary>

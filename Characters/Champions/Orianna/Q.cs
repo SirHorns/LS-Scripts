@@ -16,17 +16,28 @@ using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/19/2022
+ * Lastupdated: 3/20/2022
  * 
  * TODOS:
+ * Implement Spell Lockin on Q and E
+ * Implement Windwall Interactions
+ * 
  * ==OrianaIzunaCommand==
- * Determine Q out-of-range casting logic/functionality.
  * Create better model Change method.
  * Determine if there is better animation handling.
  * 
  *= =OrianaIzuna==
- * Figure out how oriana_ball_glow_[green/red].troy was displayed in patch 4.20
+ * Figure out how oriana_ball_glow_[green/red].troy was displayed in patch 4.20 on Live Servers it arounds the ball but I can't figure out which bone this is attached to on the ball. Look at bones in Blender?
  * Create better particle management
+ * Spell Enable/Disable checks for Q & E
+ * Spell Queueing for W & R. Might needs to handle this within the BallHandlerBuff
+ * 
+ * Known Issues:
+ * Sector for where the ball lands works but acts oddly, sometimes applies sometimes doesn't but the missile component goes through still. 
+ * Unsure if its working properly or if I am misundersnting what is occuring
+ * 
+ * Appears that trying to pull the current cooldown of a spell from within said spell is breaking. Or maybe there is a better way to do it. 
+ * Disabling CD check on Q & E for now and allowing the normal CD to keep code logic in check
 */
 //*=========================================
 
@@ -40,7 +51,7 @@ namespace Spells
         };
 
         IObjAiBase _orianna;
-        Buffs.OriannaBallHandler BallHandler;
+        Buffs.OriannaBallHandler _ballHandler;
         public void OnActivate(IObjAiBase owner, ISpell spell)
         {
             _orianna = owner;
@@ -52,7 +63,7 @@ namespace Spells
 
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
-            BallHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
+            _ballHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
         }
         
         public void OnSpellCast(ISpell spell)
@@ -61,13 +72,13 @@ namespace Spells
             var spellPos = new Vector2(spell.CastInfo.TargetPosition.X, spell.CastInfo.TargetPosition.Z);
 
 
-            if (BallHandler.GetIsAttached())
+            if (_ballHandler.GetIsAttached())
             {
-                SpellCast(_orianna, 0, SpellSlotType.ExtraSlots, spellPos, spellPos, false, BallHandler.GetAttachedChampion().Position);
+                SpellCast(_orianna, 0, SpellSlotType.ExtraSlots, spellPos, spellPos, false, _ballHandler.GetAttachedChampion().Position,overrideForceLevel: spell.CastInfo.SpellLevel);
             }
             else
             {
-                SpellCast(_orianna, 0, SpellSlotType.ExtraSlots, spellPos, spellPos, false, BallHandler.GetBall().Position);
+                SpellCast(_orianna, 0, SpellSlotType.ExtraSlots, spellPos, spellPos, false, _ballHandler.GetBall().Position, overrideForceLevel: spell.CastInfo.SpellLevel);
             }
 
             //TODO: Think of better way of handling Orianna Model Changing between spells.
@@ -86,8 +97,9 @@ namespace Spells
             var coolDown = new[] { 6f, 5.25f, 4.5f, 3.75f, 3f }[spell.CastInfo.SpellLevel - 1];
             spell.SetCooldown(coolDown);
 
-            var manaCost = new[] { 30, 35, 40, 45, 50 }[spell.CastInfo.SpellLevel - 1];
-            _orianna.Stats.CurrentMana -= manaCost;
+            //Live servers have her manna cost decrease but in gametooltips for the 4.20 gameclient show her mana cost being 50 at all spell levels.
+            //var manaCost = new[] { 30, 35, 40, 45, 50 }[spell.CastInfo.SpellLevel - 1];
+            _orianna.Stats.CurrentMana -= 50;
         }
 
         public void OnSpellChannel(ISpell spell)
@@ -118,6 +130,7 @@ namespace Spells
         private IObjAiBase _orianna;
         private ISpell _spell;
         private Vector2 _spellPos;
+        private ISpellMissile _missile;
         private Buffs.OriannaBallHandler _ballHandler;
         private ISpellSector _damageSector;
         public void OnActivate(IObjAiBase owner, ISpell spell)
@@ -135,9 +148,14 @@ namespace Spells
         {
             _spellPos = new Vector2(spell.CastInfo.TargetPosition.X, spell.CastInfo.TargetPosition.Z);
             _ballHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
+            DisableAbilityCheck();
         }
 
         public void OnSpellCast(ISpell spell)
+        {
+        }
+
+        public void OnSpellPostCast(ISpell spell)
         {
             var ballPos = _ballHandler.GetBall().Position;
             if (ballPos == _spellPos)
@@ -145,17 +163,24 @@ namespace Spells
                 CreateDamageSector();
                 AddParticlePos(_orianna, "Oriana_Izuna_nova", ballPos, ballPos, 1f, bone: "BUFFBONE_CSTM_WEAPONA");
             }
-            else 
+            else
             {
-                var missile = spell.CreateSpellMissile(new MissileParameters
+                if(_ballHandler.GetIsAttached())
+                {
+                    _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
+                    _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhostSelf");
+                }
+                
+
+                _ballHandler.SetFlightState(true);
+
+
+                _missile = spell.CreateSpellMissile(new MissileParameters
                 {
                     Type = MissileType.Circle,
                     OverrideEndPosition = _spellPos,
                 });
-
-                _ballHandler.SetFlightState(true);
-
-                ApiEventManager.OnSpellMissileEnd.AddListener(this, missile, OnMissileFinish, true);
+                ApiEventManager.OnSpellMissileEnd.AddListener(this, _missile, OnMissileFinish, true);
 
                 _ballHandler.SetRenderState(false);
 
@@ -165,10 +190,6 @@ namespace Spells
                     _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhostSef");
                 }
             }
-        }
-
-        public void OnSpellPostCast(ISpell spell)
-        {
         }
 
         private int _targetHitCount = 0;
@@ -211,10 +232,16 @@ namespace Spells
 
             AddParticlePos(_orianna, "Oriana_Izuna_nova", paritclePos, paritclePos, 1f, bone: "BUFFBONE_CSTM_WEAPONA");
 
-            CreateDamageSector();
+            _damageSector = missile.SpellOrigin.CreateSpellSector(new SectorParameters
+            {
+                Length = 10000,
+                SingleTick = true,
+                OverrideFlags = SpellDataFlags.AffectEnemies | SpellDataFlags.AffectNeutral | SpellDataFlags.AffectMinions | SpellDataFlags.AffectHeroes,
+                BindObject = _ballHandler.GetBall(),
+                Type = SectorType.Area,
+            });
 
             _targetHitCount = 0;
-            _targetsHit.Clear();
 
             TeamId enemyTeamId;
             if(_orianna.Team == TeamId.TEAM_BLUE)
@@ -241,19 +268,85 @@ namespace Spells
                 //allyMarker = AddParticlePos(_owner, "oriana_ball_glow_green.troy", BallHandler.GetBall().Position, BallHandler.GetBall().Position, 2300f, teamOnly: _owner.Team, bone: "BUFFBONE_CSTM_WEAPONA");
                 enemyMarker = AddParticlePos(_orianna, "oriana_ball_glow_red", _ballHandler.GetBall().Position, _ballHandler.GetBall().Position, 2300f, teamOnly: enemyTeamId, bone: "BUFFBONE_CSTM_WEAPONA");
             }
+            _damageSector.SetToRemove();
+            _targetsHit.Clear();
+
+            EnableAbilityCheck();
         }
 
         private void CreateDamageSector()
         {
+
             _damageSector = _spell.CreateSpellSector(new SectorParameters
             {
-                Length = 180,
-                SingleTick = true,
+                Length = 200,
                 OverrideFlags = SpellDataFlags.AffectEnemies | SpellDataFlags.AffectNeutral | SpellDataFlags.AffectMinions | SpellDataFlags.AffectHeroes,
-                BindObject = _orianna,
+                BindObject = _ballHandler.GetBall(),
                 Type = SectorType.Area,
             });
         }
+
+        bool acivateQ = false;
+        bool acivateW = false;
+        bool acivateE = false;
+        bool acivateR = false;
+        //Spell should only disable Q and E if not on CD asince W and R can be queued cast.
+        //Not sure if queue casting was present during this patch so will just asume it was.
+        private void DisableAbilityCheck()
+        {
+            //Check Q
+            if (_orianna.GetSpell(0).CurrentCooldown <= 0)
+            {
+                //_orianna.SetSpell("OrianaIzunaCommand", 0, false);
+                //acivateQ = true;
+            }
+            //Check W
+            if (_orianna.GetSpell(1).CurrentCooldown <= 0)
+            {
+                //_orianna.SetSpell("OrianaDissonanceCommand", 1, false);
+                //acivateW = true;
+            }
+            //Check E
+            if (_orianna.GetSpell(2).CurrentCooldown <= 0)
+            {
+                _orianna.SetSpell("OrianaRedactCommand", 2, false);
+                acivateE = true;
+            }
+            //Check R
+            if (_orianna.GetSpell(3).CurrentCooldown <= 0)
+            {
+                //_orianna.SetSpell("OrianaDetonateCommand", 3, false);
+                //acivateR = true;
+            }
+        }
+        private void EnableAbilityCheck()
+        {
+            //Check Q
+            if (acivateQ)
+            {
+                _orianna.SetSpell("OrianaIzunaCommand", 0, true);
+                acivateQ = false;
+            }
+            //Check W
+            if (acivateW)
+            {
+                _orianna.SetSpell("OrianaDissonanceCommand", 1, true);
+                acivateW = false;
+            }
+            //Check E
+            if (acivateE)
+            {
+                _orianna.SetSpell("OrianaRedactCommand", 2, true);
+                acivateE = false;
+            }
+            //Check R
+            if (acivateR)
+            {
+                _orianna.SetSpell("OrianaDetonateCommand", 3, true);
+                acivateR = false;
+            }
+        }
+
 
         public void OnSpellChannel(ISpell spell)
         {

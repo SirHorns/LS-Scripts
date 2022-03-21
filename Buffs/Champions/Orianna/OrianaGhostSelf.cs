@@ -8,12 +8,27 @@ using LeagueSandbox.GameServer.GameObjects.Stats;
 using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 using System;
+
+//*=========================================
+/*
+ * ValkyrieHorns
+ * Lastupdated: 3/20/2022
+ * 
+ * TODOS:
+ * 
+ * Known Issues:
+ * 
+*/
+//*=========================================
+
 namespace Buffs
 {
     class OrianaGhostSelf : IBuffGameScript
     {
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
+            BuffType = BuffType.COMBAT_ENCHANCER,
+            BuffAddType = BuffAddType.REPLACE_EXISTING,
             MaxStacks = 1
         };
 
@@ -24,7 +39,7 @@ namespace Buffs
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
             var spellLevel = ownerSpell.CastInfo.SpellLevel - 1;
-            var bonusResistances = new[] { 6, 12, 18, 24, 30 }[spellLevel];
+            var bonusResistances = new[] { 10, 15, 20, 25, 30 }[spellLevel];
             StatsModifier.Armor.FlatBonus = bonusResistances;
             StatsModifier.MagicResist.FlatBonus = bonusResistances;
             unit.AddStatModifier(StatsModifier);

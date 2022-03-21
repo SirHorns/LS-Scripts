@@ -8,24 +8,53 @@ using LeagueSandbox.GameServer.GameObjects.Stats;
 using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 using System;
+using GameServerCore.Domain;
+
+//*=========================================
+/*
+ * ValkyrieHorns
+ * Lastupdated: 3/20/2022
+ * 
+ * TODOS:
+ * Figure out if Orianna's Ally Ring is: 
+ * Visiable to her or not in this patch.
+ * Visiable to the rest of her team or not.
+ * Wait for LeagueSandbox GamerServer to implement Stealth to hide E particle. 
+ * 
+ * Live Severs she is able to see the ring.
+ * 
+ * Known Issues:
+ * 
+*/
+//*=========================================
+
 namespace Buffs
 {
     class OrianaGhost : IBuffGameScript
     {
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
-            MaxStacks = 1,
+            BuffType = BuffType.COMBAT_ENCHANCER,
+            BuffAddType = BuffAddType.REPLACE_EXISTING,
+            MaxStacks = 1
         };
 
         public IStatsModifier StatsModifier { get; private set; } = new StatsModifier ()
         {
         };
+
+        IObjAiBase _orianna;
+        Buffs.OriannaBallHandler _ballHandler;
         IParticle _bind;
         IParticle _ring;
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
+            _orianna = ownerSpell.CastInfo.Owner;
+            _ballHandler = (_orianna.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
+            ApiEventManager.OnDeath.AddListener(this, unit, TargetExecute, false);
+
             var spellLevel = ownerSpell.CastInfo.SpellLevel - 1;
-            var bonusResistances = new[] { 6, 12, 18, 24, 30 }[spellLevel];
+            var bonusResistances = new[] { 10, 15, 20, 25, 30 }[spellLevel];
             StatsModifier.Armor.FlatBonus = bonusResistances;
             StatsModifier.MagicResist.FlatBonus = bonusResistances;
             unit.AddStatModifier(StatsModifier);
@@ -34,8 +63,15 @@ namespace Buffs
             _ring = AddParticleTarget(ownerSpell.CastInfo.Owner, unit, "OriannaEAllyRangeRing", unit, 2300f, flags: FXFlags.TargetDirection,teamOnly: ownerSpell.CastInfo.Owner.Team);
         }
 
+        private void TargetExecute(IDeathData obj)
+        {
+            _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
+            _ballHandler.DropBall();
+        }
+
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
+            ApiEventManager.OnDeath.RemoveListener(this);
             _bind.SetToRemove();
             _ring.SetToRemove();
         }

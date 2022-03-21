@@ -9,20 +9,33 @@ using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using System;
 using GameServerCore.Enums;
 
+//*=========================================
+/*
+ * ValkyrieHorns
+ * Lastupdated: 3/20/2022
+ * 
+ * TODOS:
+ * Move her passive calls to a better location than they currently are.
+ * Figure out how to package her passive(s)
+ * 
+ * Known Issues:
+ * 
+*/
+//*=========================================
 
 namespace CharScripts
 {
     public class CharScriptOrianna : ICharScript
     {
-        IObjAiBase _owner;
-        IMinion oriannaBall;
-        private IAttackableUnit passiveTarget = null;
-        private IAttackableUnit currentTarget = null;
+        IObjAiBase _orianna;
+        IMinion _ball;
+        private IAttackableUnit _passiveTarget = null;
+        private IAttackableUnit _currentTarget = null;
         ISpell _spell;
         Buffs.OriannaBallHandler BallHandler;
         public void OnActivate(IObjAiBase owner, ISpell spell = null)
         {
-            _owner = owner;
+            _orianna = owner;
             _spell = spell;
             
             AddBuff("ClockworkWinding", 1f, 1, spell, owner, owner, true);
@@ -31,21 +44,21 @@ namespace CharScripts
             BallHandler.SetAttachedChampion((IChampion)owner);
 
             ApiEventManager.OnDeath.AddListener(owner, owner, OnDeath, false);
-            ApiEventManager.OnHitUnit.AddListener(this, _owner, TargetExecute, false);
+            ApiEventManager.OnHitUnit.AddListener(this, _orianna, TargetExecute, false);
         }
 
         private void TargetExecute(IDamageData data)
         {
-            currentTarget = data.Target;
+            _currentTarget = data.Target;
 
-            if (passiveTarget == currentTarget)
+            if (_passiveTarget == _currentTarget)
             {
-                AddBuff("OrianaPowerDagger", 4f, 1, _spell, _owner, _owner);
+                AddBuff("OrianaPowerDagger", 4f, 1, _spell, _orianna, _orianna);
             }
             else
             {
-                _owner.RemoveBuffsWithName("OrianaPowerDagger");
-                passiveTarget = currentTarget;
+                _orianna.RemoveBuffsWithName("OrianaPowerDagger");
+                _passiveTarget = _currentTarget;
             }
         }
 
@@ -58,9 +71,9 @@ namespace CharScripts
 
         public void OnUpdate(float diff)
         {
-            if(BallHandler.GetBall() == null)
+            if (BallHandler.GetBall() == null)
             {
-               BallHandler.SpawnBall(_owner.Position);
+                BallHandler.SpawnBall(_orianna.Position);
             }
         }
     }
