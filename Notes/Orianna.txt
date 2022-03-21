@@ -1,0 +1,52 @@
+Q Disables Q and E during flight unless on CD
+W queeded & cast on reaching final location.(Queue only for Q)
+E disables Q, W and R during flight unless they are on CD
+R queeded & cast on reaching final location. (Queue only for Q)
+
+Add To BallHandlerBuff:
+
+Q launches ball to location.
+E launches ball to Ally or Orianna
+
+[Q/E] Pressed: Ally [Orianna or Teamate Champ]
+Check if Ball is Active
+	if active launch from ball location
+Check if Ball is Attached to Ally
+	if attached launch from ally location
+Launch spell from determined location
+
+!spawn champBlue Evelynn
+!spawn champBlue Nasus
+!spawn champBlue Kalista
+
+=================================================================================================
+Passive
+=================================================================================================
+Q 
+10% less damage for each enemy hit, Minimum damage of 40%
+1. Damage:  60 + (50% AP), CD: 6.00, Mana: 50
+2. Damage:  90 + (50% AP), CD: 5.25, Mana: 50
+3. Damage: 120 + (50% AP), CD: 4.50, Mana: 50
+4. Damage: 150 + (50% AP), CD: 3.75, Mana: 50
+5. Damage: 180 + (50% AP), CD: 3.00, Mana: 50
+=================================================================================================
+W 
+1. Damage:  70 + (70% AP), Ms/Slow: 20%, CD: 9.00, Mana:  70
+2. Damage: 115 + (70% AP), Ms/Slow: 25%, CD: 9.00, Mana:  80
+3. Damage: 160 + (70% AP), Ms/Slow: 30%, CD: 9.00, Mana:  90
+4. Damage: 205 + (70% AP), Ms/Slow: 35%, CD: 9.00, Mana: 100
+5. Damage: 250 + (70% AP), Ms/Slow: 40%, CD: 9.00, Mana: 110
+=================================================================================================
+E
+1. ARM/MR: 10, Shield:  80 + (40% AP), Damage: 75% shield value ->  60 + (30% AP), CD: 9.00, Mana:  60
+2. ARM/MR: 15, Shield: 120 + (40% AP), Damage: 75% shield value ->  90 + (30% AP), CD: 9.00, Mana:  60
+3. ARM/MR: 20, Shield: 160 + (40% AP), Damage: 75% shield value -> 120 + (30% AP), CD: 9.00, Mana:  60
+4. ARM/MR: 25, Shield: 200 + (40% AP), Damage: 75% shield value -> 150 + (30% AP), CD: 9.00, Mana:  60
+5. ARM/MR: 30, Shield: 240 + (40% AP), Damage: 75% shield value -> 180 + (30% AP), CD: 9.00, Mana:  60
+=================================================================================================
+R
+Fling targets to center set unti distance.
+1. Damage: 150 + (70% AP), CD: 120.00, Mana:  100
+2. Damage: 225 + (70% AP), CD: 105.00, Mana:  125
+3. Damage: 300 + (70% AP), CD:  90.00, Mana:  150
+=================================================================================================
