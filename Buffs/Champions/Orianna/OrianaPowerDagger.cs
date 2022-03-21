@@ -10,6 +10,17 @@ using LeagueSandbox.GameServer.Scripting.CSharp;
 using GameServerCore.Domain;
 using System;
 
+//*=========================================
+/*
+ * ValkyrieHorns
+ * Lastupdated: 3/21/2022
+ * 
+ * TODOS:
+ * 
+ * Known Issues:
+*/
+//*========================================
+
 namespace Buffs
 {
     class OrianaPowerDagger : IBuffGameScript

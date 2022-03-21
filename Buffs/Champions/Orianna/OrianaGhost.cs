@@ -17,13 +17,15 @@ using GameServerCore.Domain;
  * 
  * TODOS:
  * Figure out if Orianna's Ally Ring is: 
- * Visiable to her or not in this patch.
- * Visiable to the rest of her team or not.
+ * Visible to her or not in this patch.
+ * Visible to the rest of her team or not.
  * Wait for LeagueSandbox GamerServer to implement Stealth to hide E particle. 
+ * Add in check for if buff holder is outside of ball leash range and cast OriannReturn if they are.
  * 
  * Live Severs she is able to see the ring.
  * 
  * Known Issues:
+ * Places a buff timer countdown despite this buff not having a timer. Need to figure out why
  * 
 */
 //*=========================================

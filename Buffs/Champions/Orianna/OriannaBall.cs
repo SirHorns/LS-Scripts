@@ -9,6 +9,17 @@ using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 using System;
 
+//*=========================================
+/*
+ * ValkyrieHorns
+ * Lastupdated: 3/21/2022
+ * 
+ * TODOS:
+ * Decide if this should be attached to the ball or Orianna as an internal script
+ * Known Issues:
+*/
+//*========================================
+
 namespace Buffs
 {
     class OriannaBall : IBuffGameScript

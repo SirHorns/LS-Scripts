@@ -17,6 +17,7 @@ using System;
  * TODOS:
  * 
  * Known Issues:
+ * Places a buff timer countdown despite this buff not having a timer. Need to figure out why
  * 
 */
 //*=========================================
