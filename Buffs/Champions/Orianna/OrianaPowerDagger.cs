@@ -1,19 +1,16 @@
-﻿using System.Numerics;
-using GameServerCore.Domain.GameObjects;
+﻿using GameServerCore.Domain.GameObjects;
 using GameServerCore.Domain.GameObjects.Spell;
 using GameServerCore.Enums;
 using GameServerCore.Scripting.CSharp;
 using LeagueSandbox.GameServer.API;
 using LeagueSandbox.GameServer.GameObjects.Stats;
-using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 using GameServerCore.Domain;
-using System;
 
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/21/2022
+ * Lastupdated: 3/25/2022
  * 
  * TODOS:
  * 
@@ -48,7 +45,7 @@ namespace Buffs
 
         private void TargetExecute(IDamageData data)
         {
-            var damage = CalculatekDamage(thisOwner.Stats.Level) * thisBuff.StackCount;
+            var damage = CalculatekDamage(thisOwner.Stats.Level);
             data.Target.TakeDamage(thisOwner, damage, DamageType.DAMAGE_TYPE_MAGICAL, DamageSource.DAMAGE_SOURCE_ATTACK, false);
         }
 

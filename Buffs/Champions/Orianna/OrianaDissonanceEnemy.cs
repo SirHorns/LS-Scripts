@@ -12,21 +12,19 @@ using System;
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/20/2022
+ * Lastupdated: 3/25/2022
  * 
  * TODOS:
  * Add particles for orianna W ms slow
  * 
  * Known Issues:
- * Buff Icon for this buff does not show up.
- * Maybe class name used client side is different compared to the ones listed within the severside files?
- * Also possible that during this patch they didn't have icons? Need to find old Orianna replay file to confirm this issue.
+ * 
 */
 //*========================================
 
 namespace Buffs
 {
-    class OrianaDissonanceEnemy : IBuffGameScript
+    class OrianaSlow : IBuffGameScript
     {
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
