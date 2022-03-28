@@ -12,10 +12,11 @@ using System;
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/25/2022
+ * Lastupdated: 3/26/2022
  * 
  * TODOS:
  * Add particles for orianna  W ms boost
+ * Add in Decaying buff component
  * 
  * Known Issues:
 */
@@ -27,7 +28,7 @@ namespace Buffs
     {
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
-            BuffType = BuffType.COMBAT_ENCHANCER,
+            BuffType = BuffType.HASTE,
             BuffAddType = BuffAddType.RENEW_EXISTING,
             MaxStacks = 1
         };
@@ -36,20 +37,37 @@ namespace Buffs
         {
         };
 
+        float _currentPercentBonus;
+        float _totalBonus;
+        bool _decay = false;
+        IAttackableUnit _buffHolder;
+        float _r;
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            StatsModifier.MoveSpeed.PercentBonus = new[] { .2f, .25f, .3f, .35f, .4f }[ownerSpell.CastInfo.SpellLevel - 1];
+            
+
+            _buffHolder = unit;
+
+            _decay = false;
+            _currentPercentBonus = new[] { .2f, .25f, .3f, .35f, .4f }[ownerSpell.CastInfo.SpellLevel - 1];
+            _totalBonus = _buffHolder.Stats.MoveSpeed.Total * _currentPercentBonus;
+            _r = _totalBonus / 2;
+
+            StatsModifier.MoveSpeed.PercentBonus = _currentPercentBonus;
+
             unit.AddStatModifier(StatsModifier);
+
+            _decay = true;
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
         }
 
-        public void OnPreAttack(ISpell spell)
-        {
-        }
-
+        //forumla f(t) = C - r*t
+        //[Remaining Bonus MS] - r * 2
+        // r = CBMS / 2 = 
+        float _decayTime = 0.0f; 
         public void OnUpdate(float diff)
         {
         }

@@ -68,7 +68,7 @@ namespace Buffs
         private void TargetExecute(IDeathData obj)
         {
             _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
-            _ballHandler.DropBall();
+            _ballHandler.DropOriannaBall();
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)

@@ -16,6 +16,7 @@ using System;
  * 
  * TODOS:
  * Add particles for orianna W ms slow
+ * Add in Decaying buff component
  * 
  * Known Issues:
  * 

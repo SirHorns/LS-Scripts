@@ -8,15 +8,19 @@ using LeagueSandbox.GameServer.GameObjects.Stats;
 using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 using System;
+using GameServerCore.Domain.GameObjects.Spell.Missile;
+using GameServerCore.Domain.GameObjects.Spell.Sector;
 
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/21/2022
+ * Lastupdated: 3/28/2022
  * 
  * TODOS:
- * Decide if this should be attached to the ball or Orianna as an internal script
+ * See if I can find definitive numbers on the leash ranges used by Orianna
+ * 
  * Known Issues:
+ * Leash Range becomes way to large if Ball is passed from Orianna to a Allied Champion.
 */
 //*========================================
 
@@ -26,60 +30,73 @@ namespace Buffs
     {
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
-            BuffType = BuffType.COMBAT_ENCHANCER,
+            BuffType = BuffType.INTERNAL,
             BuffAddType = BuffAddType.REPLACE_EXISTING,
-            MaxStacks = 1
+            MaxStacks = 1,
         };
 
-        IObjAiBase _owner;
-        IBuff ThisBuff;
-        Buffs.OriannaBallHandler BallHandler;
-        IMinion _ball;
-        IParticle currentIndicator;
-        int previousIndicatorState;
+        private IObjAiBase _orianna;
+        private IMinion _oriannaBall;
+        private ISpell _spell;
+        private IBuff _buff;
+        private IParticle _currentIndicator;
+        private ISpellSector _pickupSector;
+
+        Buffs.OriannaBallHandler _ballHandler;
+        
         public IStatsModifier StatsModifier { get; private set; } = new StatsModifier ();
 
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            _owner = ownerSpell.CastInfo.Owner;
-            ThisBuff = buff;
-            BallHandler = (_owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
-            _ball = unit as IMinion;
+            _orianna = ownerSpell.CastInfo.Owner;
+            _spell = ownerSpell;
+            _buff = buff;
+            _ballHandler = _orianna.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler;
+            _oriannaBall = unit as IMinion;
 
             buff.SetStatusEffect(StatusFlags.Targetable, false);
             buff.SetStatusEffect(StatusFlags.Ghosted, true);
-
-            AddParticleTarget(_ball.Owner, _ball, "zed_base_w_tar", _ball);
-
-            currentIndicator = AddParticleTarget(_ball.Owner, _ball.Owner, "OrianaBallIndicatorFar", _ball, 5f, flags: FXFlags.TargetDirection);
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            if (_ball != null && !_ball.IsDead)
+            if (_currentIndicator != null)
             {
-                if (currentIndicator != null)
-                {
-                    currentIndicator.SetToRemove();
-                }
-
-                SetStatus(_ball, StatusFlags.NoRender, true);
-                AddParticle(_ball.Owner, null, "zed_base_clonedeath", _ball.Position);
-                //Ball.TakeDamage(Ball.Owner, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
+                _currentIndicator.SetToRemove();
             }
         }
 
-        public int GetIndicatorState()
+        public int CurrentGroundedLeashRange()
         {
-            var dist = Vector2.Distance(_ball.Owner.Position, _ball.Position);
+            var dist = Vector2.Distance(_oriannaBall.Owner.Position, _oriannaBall.Position);
             var state = 0;
 
-            if (!_ball.Owner.HasBuff("TheBall"))
+            if (dist >= 1290.0f)
             {
-                return state;
+                state = 0;
+            }
+            else if (dist >= 1190.0f)
+            {
+                state = 1;
+            }
+            else if (dist >= 1000.0f)
+            {
+                state = 2;
+            }
+            else if (dist >= 0f)
+            {
+                state = 3;
             }
 
-            if (dist >= 1290.0f)
+            return state;
+        }
+
+        public int CurrentAttachedLeashRange()
+        {
+            var dist = Vector2.Distance(_orianna.Position, _oriannaBall.Position);
+            var state = 0;
+
+            if (dist >= 1300.0f)
             {
                 state = 0;
             }
@@ -122,32 +139,65 @@ namespace Buffs
             }
         }
 
-        int state;
-        public void OnUpdate(float diff)
+        private void CheckIndicator()
         {
-            state = GetIndicatorState();
-
-            if (!BallHandler.GetIsAttached()) 
+            if (_currentIndicator != null)
             {
-                if (state == 0)
+                _currentIndicator.SetToRemove();
+            }
+        }
+
+        private void LeashRangeCheck()
+        {
+            if (_ballHandler.GetAttachedChampion() != _orianna as IChampion)
+            {
+                if (!_ballHandler.GetStateFlying())
                 {
-                    //SpellCast(_owner,3,SpellSlotType.ExtraSlots,true,Ball,Ball.Position);
+                    CheckIndicator();
+
+                    if (_ballHandler.GetStateAttached() && _ballHandler.GetAttachedChampion() != _orianna as IChampion)
+                    {
+                        if (CurrentAttachedLeashRange() == 0)
+                        {
+                            SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, true, _orianna, Vector2.Zero);
+                        }
+                        else
+                        {
+                            _currentIndicator = AddParticleTarget(_orianna, _orianna, GetIndicatorName(CurrentAttachedLeashRange()), _ballHandler.GetAttachedChampion(), _buff.Duration - _buff.TimeElapsed, flags: FXFlags.TargetDirection);
+                        }
+                    }
+                    else
+                    {
+                        if (CurrentGroundedLeashRange() == 0)
+                        {
+                            SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, false, _orianna, Vector2.Zero);
+                        }
+                        else
+                        {
+                            _currentIndicator = AddParticleTarget(_orianna, _orianna, GetIndicatorName(CurrentGroundedLeashRange()), _oriannaBall, _buff.Duration - _buff.TimeElapsed, flags: FXFlags.TargetDirection);
+                        }
+                    }
                 }
                 else
                 {
-                    if (state != previousIndicatorState)
-                    {
-                        previousIndicatorState = state;
-                        if (currentIndicator != null)
-                        {
-                            currentIndicator.SetToRemove();
-                        }
-
-                        currentIndicator = AddParticleTarget(_ball.Owner, _ball.Owner, GetIndicatorName(state), _ball, ThisBuff.Duration - ThisBuff.TimeElapsed, flags: FXFlags.TargetDirection);
-                    }
+                    CheckIndicator();
                 }
             }
-            
+        }
+
+        private void PickupBallCheck()
+        {
+            if(!_ballHandler.GetStateAttached() && GetUnitsInRange(_oriannaBall.Position, 135f, true).Contains(_orianna))
+            {
+                _currentIndicator.SetToRemove();
+                SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, true, _orianna, Vector2.Zero);
+            }
+        }
+
+        public void OnUpdate(float diff)
+        {
+            PickupBallCheck();
+            LeashRangeCheck();
         }
     }
 }
