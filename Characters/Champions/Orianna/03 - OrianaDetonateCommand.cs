@@ -20,10 +20,6 @@ using GameServerCore.Domain.GameObjects.Spell.Missile;
  * 
  * TODOS:
  * 
- * ==OrianaDetonateCommand==
- * 
- *= =OrianaDissonanceWave==
- * 
  * Known Issues:
  * 
 */
@@ -35,10 +31,21 @@ namespace Spells
     {
         public ISpellScriptMetadata ScriptMetadata { get; private set; } = new SpellScriptMetadata()
         {
+            TriggersSpellCasts = true,
+            NotSingleTargetSpell = true,
+            IsDamagingSpell = true,
+            ChannelDuration = 0.5f,
+            AutoFaceDirection = true,
         };
 
+        private IObjAiBase _orianna;
+        private ISpell _spell;
+
+        private Buffs.OriannaBallHandler _ballHandler;
         public void OnActivate(IObjAiBase owner, ISpell spell)
         {
+            _orianna = owner;
+            _spell = spell;
         }
 
         public void OnDeactivate(IObjAiBase owner, ISpell spell)
@@ -47,6 +54,7 @@ namespace Spells
 
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
+            _ballHandler = (_orianna.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
         }
 
         public void OnSpellCast(ISpell spell)
@@ -59,6 +67,16 @@ namespace Spells
 
         public void OnSpellChannel(ISpell spell)
         {
+            Console.WriteLine("OnChannl");
+
+            foreach (var unit in GetUnitsInRange(_ballHandler.GetBall().Position, 1000, true))
+            {
+                if (unit.Team != _orianna.Team)
+                {
+                    AddBuff("OrianaStun", .75f, 1, spell, unit, _orianna);
+                }
+            }
+
         }
 
         public void OnSpellChannelCancel(ISpell spell, ChannelingStopSource reason)
@@ -67,6 +85,7 @@ namespace Spells
 
         public void OnSpellPostChannel(ISpell spell)
         {
+            Console.WriteLine("OnPostChannl");
         }
 
         public void OnUpdate(float diff)

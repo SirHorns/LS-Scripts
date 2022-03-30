@@ -13,7 +13,7 @@ using GameServerCore.Domain;
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/20/2022
+ * Lastupdated: 3/28/2022
  * 
  * TODOS:
  * Figure out if Orianna's Ally Ring is: 
@@ -22,7 +22,6 @@ using GameServerCore.Domain;
  * Wait for LeagueSandbox GamerServer to implement Stealth to hide E particle. 
  * Add in check for if buff holder is outside of ball leash range and cast OriannReturn if they are.
  * 
- * Live Severs she is able to see the ring.
  * 
  * Known Issues:
  * Places a buff timer countdown despite this buff not having a timer. Need to figure out why
@@ -37,8 +36,7 @@ namespace Buffs
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
             BuffType = BuffType.COMBAT_ENCHANCER,
-            BuffAddType = BuffAddType.REPLACE_EXISTING,
-            MaxStacks = 1
+            BuffAddType = BuffAddType.REPLACE_EXISTING
         };
 
         public IStatsModifier StatsModifier { get; private set; } = new StatsModifier ()
@@ -68,7 +66,7 @@ namespace Buffs
         private void TargetExecute(IDeathData obj)
         {
             _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
-            _ballHandler.DropOriannaBall();
+            _ballHandler.DropBall();
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)

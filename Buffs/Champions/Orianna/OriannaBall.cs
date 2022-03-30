@@ -16,11 +16,14 @@ using GameServerCore.Domain.GameObjects.Spell.Sector;
  * ValkyrieHorns
  * Lastupdated: 3/28/2022
  * 
+ * Notes:
+ * Might rename this script or possibly nest this functionality with BallHandler or package in with Orianna's Clockwork Winding buff file.
+ * 
  * TODOS:
- * See if I can find definitive numbers on the leash ranges used by Orianna
+ * Find definitive numbers on the leash and pickup ranges used by Orianna, for now they are just wiki and aproximation.
  * 
  * Known Issues:
- * Leash Range becomes way to large if Ball is passed from Orianna to a Allied Champion.
+ * 
 */
 //*========================================
 
@@ -40,7 +43,6 @@ namespace Buffs
         private ISpell _spell;
         private IBuff _buff;
         private IParticle _currentIndicator;
-        private ISpellSector _pickupSector;
 
         Buffs.OriannaBallHandler _ballHandler;
         
@@ -52,7 +54,7 @@ namespace Buffs
             _spell = ownerSpell;
             _buff = buff;
             _ballHandler = _orianna.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler;
-            _oriannaBall = unit as IMinion;
+            _oriannaBall = _ballHandler.GetBall();
 
             buff.SetStatusEffect(StatusFlags.Targetable, false);
             buff.SetStatusEffect(StatusFlags.Ghosted, true);
@@ -66,55 +68,6 @@ namespace Buffs
             }
         }
 
-        public int CurrentGroundedLeashRange()
-        {
-            var dist = Vector2.Distance(_oriannaBall.Owner.Position, _oriannaBall.Position);
-            var state = 0;
-
-            if (dist >= 1290.0f)
-            {
-                state = 0;
-            }
-            else if (dist >= 1190.0f)
-            {
-                state = 1;
-            }
-            else if (dist >= 1000.0f)
-            {
-                state = 2;
-            }
-            else if (dist >= 0f)
-            {
-                state = 3;
-            }
-
-            return state;
-        }
-
-        public int CurrentAttachedLeashRange()
-        {
-            var dist = Vector2.Distance(_orianna.Position, _oriannaBall.Position);
-            var state = 0;
-
-            if (dist >= 1300.0f)
-            {
-                state = 0;
-            }
-            else if (dist >= 1200.0f)
-            {
-                state = 1;
-            }
-            else if (dist >= 1000.0f)
-            {
-                state = 2;
-            }
-            else if (dist >= 0f)
-            {
-                state = 3;
-            }
-
-            return state;
-        }
 
         public string GetIndicatorName(int state)
         {
@@ -139,7 +92,7 @@ namespace Buffs
             }
         }
 
-        private void CheckIndicator()
+        private void RemoveIndicator()
         {
             if (_currentIndicator != null)
             {
@@ -147,57 +100,115 @@ namespace Buffs
             }
         }
 
-        private void LeashRangeCheck()
-        {
-            if (_ballHandler.GetAttachedChampion() != _orianna as IChampion)
-            {
-                if (!_ballHandler.GetStateFlying())
-                {
-                    CheckIndicator();
-
-                    if (_ballHandler.GetStateAttached() && _ballHandler.GetAttachedChampion() != _orianna as IChampion)
-                    {
-                        if (CurrentAttachedLeashRange() == 0)
-                        {
-                            SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, true, _orianna, Vector2.Zero);
-                        }
-                        else
-                        {
-                            _currentIndicator = AddParticleTarget(_orianna, _orianna, GetIndicatorName(CurrentAttachedLeashRange()), _ballHandler.GetAttachedChampion(), _buff.Duration - _buff.TimeElapsed, flags: FXFlags.TargetDirection);
-                        }
-                    }
-                    else
-                    {
-                        if (CurrentGroundedLeashRange() == 0)
-                        {
-                            SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, false, _orianna, Vector2.Zero);
-                        }
-                        else
-                        {
-                            _currentIndicator = AddParticleTarget(_orianna, _orianna, GetIndicatorName(CurrentGroundedLeashRange()), _oriannaBall, _buff.Duration - _buff.TimeElapsed, flags: FXFlags.TargetDirection);
-                        }
-                    }
-                }
-                else
-                {
-                    CheckIndicator();
-                }
-            }
-        }
-
         private void PickupBallCheck()
         {
             if(!_ballHandler.GetStateAttached() && GetUnitsInRange(_oriannaBall.Position, 135f, true).Contains(_orianna))
             {
-                _currentIndicator.SetToRemove();
-                SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, true, _orianna, Vector2.Zero);
+                RemoveIndicator();
+                _ballHandler.ReturnBall(true);
+                //SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, true, _orianna, Vector2.Zero);
             }
+        }
+
+        private void LeashAttached()
+        {
+            if (_ballHandler.GetAttachedChampion() == _orianna as IChampion)
+            {
+                return;
+            }
+
+            if (_ballHandler.GetStateFlying())
+            {
+                RemoveIndicator();
+                return;
+            }
+
+            var dist = Vector2.Distance(_orianna.Position, _ballHandler.GetAttachedChampion().Position);
+            var state = 0;
+
+            if (dist >= 1300.0f)
+            {
+                state = 0;
+            }
+            else if (dist >= 1200.0f)
+            {
+                state = 1;
+            }
+            else if (dist >= 1000.0f)
+            {
+                state = 2;
+            }
+            else if (dist >= 0f)
+            {
+                state = 3;
+            }
+
+            var indicator = GetIndicatorName(state);
+
+            RemoveIndicator();
+
+            if (state == 0)
+            {
+                _ballHandler.ReturnBall(true);
+                return;
+            }
+            
+            _currentIndicator = AddParticleTarget(_orianna, _orianna, indicator, _ballHandler.GetAttachedChampion(), _buff.Duration - _buff.TimeElapsed, flags: FXFlags.TargetDirection); 
+        }
+
+        private void LeashGrounded()
+        {
+            if (_ballHandler.GetStateFlying())
+            {
+                RemoveIndicator();
+                return;
+            }
+
+            var dist = Vector2.Distance(_orianna.Position, _oriannaBall.Position);
+            var state = 0;
+
+            if (dist >= 1290.0f)
+            {
+                state = 0;
+            }
+            else if (dist >= 1190.0f)
+            {
+                state = 1;
+            }
+            else if (dist >= 1000.0f)
+            {
+                state = 2;
+            }
+            else if (dist >= 0f)
+            {
+                state = 3;
+            }
+
+            var indicator = GetIndicatorName(state);
+
+            RemoveIndicator();
+
+            if (state == 0)
+            {
+                _ballHandler.ReturnBall(false);
+                return;
+            }
+            
+            _currentIndicator = AddParticleTarget(_orianna, _orianna, indicator, _oriannaBall, _buff.Duration - _buff.TimeElapsed, flags: FXFlags.TargetDirection);
         }
 
         public void OnUpdate(float diff)
         {
             PickupBallCheck();
-            LeashRangeCheck();
+
+            if (_ballHandler.GetStateAttached())
+            {
+                LeashAttached();
+            }
+            else
+            {
+                LeashGrounded();
+            }
         }
     }
 }

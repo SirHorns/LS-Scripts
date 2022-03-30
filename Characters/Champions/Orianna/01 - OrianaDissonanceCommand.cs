@@ -16,10 +16,11 @@ using GameServerCore.Domain.GameObjects.Spell.Missile;
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/28/2022
+ * Lastupdated: 3/30/2022
  * 
  * TODOS:
- * Find particle used on champs damaged by W. Looked to be a shared particle with Ultimate on Damage particle. this is a placeholder particle
+ * Find particle used on champs damaged by W. Looked to be a shared particle with Ultimate on Damage particle.
+ * Uses a placeholder particle for now.
  * 
  * Known Issues:
 */
@@ -52,6 +53,7 @@ namespace Spells
         {
             _orianna = owner;
             _spell = spell;
+
             ApiEventManager.OnSpellHit.AddListener(this, spell, TargetExecute, false);
         }
 
@@ -83,7 +85,6 @@ namespace Spells
                 AddParticleTarget(_orianna, target, "Oriana_ts_tar.troy", target, 1f, teamOnly: _orianna.Team, bone: "pelvis", targetBone: "pelvis");
                 target.TakeDamage(_orianna, finalDamage, DamageType.DAMAGE_TYPE_MAGICAL, DamageSource.DAMAGE_SOURCE_SPELL, false);
             }
-                
         }
 
         public void OnDeactivate(IObjAiBase owner, ISpell spell)
@@ -93,7 +94,7 @@ namespace Spells
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
             _ballHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
-            _oriannaBall = _ballHandler.GetOriannaBall();
+            _oriannaBall = _ballHandler.GetBall();
         }
 
         public void OnSpellCast(ISpell spell)
@@ -105,9 +106,9 @@ namespace Spells
             }
             else
             {
-                if(_ballHandler.GetStateFlying())
+                if (_ballHandler.GetStateFlying())
                 {
-
+                    //TODO: Queue Spell to cast at final location. Grounded or Attached.
                 }
                 else
                 {

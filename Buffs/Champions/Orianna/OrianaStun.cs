@@ -8,45 +8,61 @@ using LeagueSandbox.GameServer.GameObjects.Stats;
 using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 using LeagueSandbox.GameServer.Scripting.CSharp;
 using System;
+using GameServerCore.Domain;
 
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/20/2022
+ * Lastupdated: 3/30/2022
  * 
  * TODOS:
  * 
  * Known Issues:
- * Places a buff timer countdown despite this buff not having a timer. Need to figure out why
- * 
+ * I have no idea how to get force moment to work properly.
 */
 //*=========================================
 
 namespace Buffs
 {
-    class OrianaGhostSelf : IBuffGameScript
+    class OrianaStun : IBuffGameScript
     {
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
-            BuffType = BuffType.COMBAT_ENCHANCER,
+            BuffType = BuffType.COMBAT_DEHANCER,
             BuffAddType = BuffAddType.REPLACE_EXISTING,
+            MaxStacks = 1,
         };
 
         public IStatsModifier StatsModifier { get; private set; } = new StatsModifier ()
         {
         };
 
+        IObjAiBase _orianna;
+        IMinion _oriannaBall;
+        OriannaBallHandler _ballHandler;
+        IParticle stun;
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            var spellLevel = ownerSpell.CastInfo.SpellLevel - 1;
-            var bonusResistances = new[] { 10, 15, 20, 25, 30 }[spellLevel];
-            StatsModifier.Armor.FlatBonus = bonusResistances;
-            StatsModifier.MagicResist.FlatBonus = bonusResistances;
-            unit.AddStatModifier(StatsModifier);
+            _orianna = ownerSpell.CastInfo.Owner;
+            _ballHandler = (_orianna.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
+            _oriannaBall = _ballHandler.GetBall();
+
+            var tossPos = GetPointFromUnit(unit, 500f);
+            ForceMovement(unit, "STUNNED", _ballHandler.GetBall().Position, 1000f, 500f, .3f, 100f, movementOrdersFacing: ForceMovementOrdersFacing.FACE_MOVEMENT_DIRECTION);
+
+            SetStatusFlags(buff, true);
+            stun = AddParticleTarget(ownerSpell.CastInfo.Owner, unit, "LOC_Stun", unit, buff.Duration, bone: "head");
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
+            SetStatusFlags(buff, false);
+            RemoveParticle(stun);
+        }
+
+        private void SetStatusFlags(IBuff buff, bool toggle)
+        {
+            buff.SetStatusEffect(StatusFlags.Stunned, toggle);
         }
 
         public void OnPreAttack(ISpell spell)

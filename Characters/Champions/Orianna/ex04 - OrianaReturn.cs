@@ -16,6 +16,7 @@ namespace Spells
     {
         public ISpellScriptMetadata ScriptMetadata { get; private set; } = new SpellScriptMetadata()
         {
+            TriggersSpellCasts = true,
             IsDamagingSpell = false
         };
 
@@ -37,14 +38,15 @@ namespace Spells
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
             _ballHandler = _orianna.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler;
-            _oriannaBall = _ballHandler.GetOriannaBall();
+            _oriannaBall = _ballHandler.GetBall();
 
             if (_ballHandler.GetStateAttached())
             {
-                _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
+                _ballHandler.RemoveEBuff();
             }
 
-            _ballHandler.DisableOriannaBall();
+            _ballHandler.DisableBall();
+            _ballHandler.AttachToChampion(_orianna as IChampion);
 
             if (_orianna.GetSpell(2).CastInfo.SpellLevel > 0)
             {

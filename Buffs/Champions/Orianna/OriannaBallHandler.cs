@@ -33,6 +33,14 @@ namespace Buffs
 {
     class OriannaBallHandler : IBuffGameScript
     {
+        public enum BallState : byte
+        {
+            ATTACHED,
+            GROUNDED,
+            FLYING,
+            DISABLED
+        }
+
         public IBuffScriptMetaData BuffMetaData { get; set; } = new BuffScriptMetaData
         {
             BuffType = BuffType.INTERNAL,
@@ -44,39 +52,59 @@ namespace Buffs
 
         private IObjAiBase _orianna;
         private ISpell _spell;
-        private OriannaBall _ballBuff;
+        private OriannaBall _oriannaBallBuff;
 
         private IMinion _oriannaBall = null;
-        private IChampion AttachedChampion;
+        private IChampion _attachedChampion;
 
+        private BallState _currentState;
         private bool IsFlying = false;
         private bool IsGrounded = false;
         private bool IsAttached = true;
         private bool IsRendered = false;
-        
+        private bool CanBePickedUp = false;
 
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
             _orianna = (IObjAiBase) unit;
             _spell = ownerSpell;
             ApiEventManager.OnDeath.AddListener(this, unit, OnDeath, false);
-            SpawnOriannaBall(_orianna.Position);
+            ApiEventManager.OnResurrect.AddListener(this, _orianna, OnRevive, false);
+
+            SpawnBall(_orianna.Position);
+            AttachToChampion(_orianna as IChampion);
         }
 
-        private void OnDeath(IDeathData obj)
+        private void OnRevive(IObjAiBase unit)
         {
-            DisableOriannaBall();
+            ChangeState(BallState.DISABLED);
+            ChangeState(BallState.ATTACHED);
+            AttachToChampion(_orianna as IChampion);
+            AddEBuff(_orianna, _orianna.GetSpell(2));
+        }
+
+        private void OnDeath(IDeathData death)
+        {
+            ChangeState(BallState.DISABLED);
         }
 
         public void OnDeactivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
-            DisableOriannaBall();
-            _oriannaBall.TakeDamage(_orianna, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
+            //DisableBall();
+            //_oriannaBall.TakeDamage(_orianna, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
         }
 
 
-
         #region State-Getters
+
+        /// <summary>
+        /// Returns current pickable state
+        /// </summary>
+        /// <returns>Pickupable state.</returns>
+        public bool SetStatePickupable()
+        {
+            return this.CanBePickedUp;
+        }
 
         /// <summary>
         /// Returns if the ball is in flight.
@@ -119,42 +147,33 @@ namespace Buffs
         #region State-Setters
 
         /// <summary>
+        /// Sets if the ball can be picked up.
+        /// </summary>
+        /// <param name="pickupable">Sets if the ball can be picked up</param>
+        /// <returns>Pickupable state.</returns>
+        public bool SetStatePickupable(bool pickupable)
+        {
+            return CanBePickedUp = pickupable;
+        }
+
+        /// <summary>
         /// Sets if the ball is in flight.
         /// </summary>
-        /// <param name="IsFlying">Sets ball state to in flight.</param>
+        /// <param name="flying">Sets ball state to in flight.</param>
         /// <returns>If ball is is in flight.</returns>
-        public bool SetStateFlying(bool IsFlying)
+        public bool SetStateFlying(bool flying)
         {
-            if (IsFlying)
-            {
-                SetStateAttached(false);
-                SetAttachedChampion(null);
-                SetStateRendered(false);
-            }
-
-            this.IsFlying = IsFlying;
-            return this.IsFlying;
+            return IsFlying = flying;
         }
 
         /// <summary>
         /// Sets the ball grounded and attached states based on input.
         /// </summary>
-        /// <param name="IsGrounded">Should the ball be active or disabled</param>
+        /// <param name="grounded">Should the ball be active or disabled</param>
         /// <returns>If ball is grounded or not.</returns>
-        public bool SetStateGrounded(bool IsGrounded)
+        public bool SetStateGrounded(bool grounded)
         {
-            this.IsGrounded = IsGrounded;
-
-            if (IsGrounded)
-            {
-                SetStateRendered(true);
-            }
-            else
-            {
-                SetStateRendered(false);
-            }
-
-            return this.IsGrounded;
+            return IsGrounded = grounded;
         }
 
         /// <summary>
@@ -164,17 +183,17 @@ namespace Buffs
         /// <returns>If ball is attached to a champion or not.</returns>
         public bool SetStateAttached(bool attached)
         {
-            return this.IsAttached = attached;
+            return IsAttached = attached;
         }
 
         /// <summary>
         /// Set the ball render state.
         /// </summary>
-        /// <param name="IsRendered">Bool for if the ball should be rendered or not.</param>
+        /// <param name="render">Bool for if the ball should be rendered or not.</param>
         /// <returns>If ball is rendered or not.</returns>
-        public bool SetStateRendered(bool IsRendered)
+        public bool SetStateRendered(bool render)
         {
-            if (IsRendered)
+            if (render)
             {
                 SetStatus(_oriannaBall, StatusFlags.NoRender, false);
             }
@@ -183,15 +202,22 @@ namespace Buffs
                 SetStatus(_oriannaBall, StatusFlags.NoRender, true);
             }
 
-            this.IsRendered = IsRendered;
-            return this.IsRendered;
+            return IsRendered = render;
         }
 
         #endregion
 
 
-
         #region General Getter Methods
+
+        /// <summary>
+        /// Returns the current instance of a Orianna Ball.
+        /// </summary>
+        /// <returns>Current instance of Orianna Ball</returns>
+        public IMinion GetBall()
+        {
+            return _oriannaBall;
+        }
 
         /// <summary>
         /// Returns the current champion the ball is attached.
@@ -199,7 +225,7 @@ namespace Buffs
         /// <returns>Champion the Ball is Attached to.</returns>
         public IChampion GetAttachedChampion()
         {
-            return this.AttachedChampion;
+            return this._attachedChampion;
         }
 
         #endregion
@@ -213,12 +239,12 @@ namespace Buffs
         /// <returns>Champion the ball will be attached to.</returns>
         public IChampion SetAttachedChampion(IChampion champion)
         {
-            this.AttachedChampion = champion;
-            return this.AttachedChampion;
+            SetStateAttached(true);
+            this._attachedChampion = champion;
+            return this._attachedChampion;
         }
 
         #endregion
-
 
 
         #region Helper-Methods
@@ -229,75 +255,59 @@ namespace Buffs
         /// <param name="position">Position to spawn ball at.</param>
         /// <param name="renderState">Sets if the ball should be rendered on spawn.</param>
         /// <returns>New instance of a Orianna Ball.</returns>
-        public IMinion SpawnOriannaBall(Vector2 position, bool renderState = false)
+        public IMinion SpawnBall(Vector2 position, bool renderState = false)
         {
             //var spellPos = new Vector2(position.X, position.Y);
             //OriannaBall = AddMinion(_owner, "OriannaBall", "OriannaBall" + _owner.Team, position, _owner.Team, _owner.SkinID, true, false,SpellDataFlags.NonTargetableAll,visibilityOwner: null,true);
             _oriannaBall = AddMinion(_orianna, "OriannaBall", "OriannaBall" + _orianna.Team, position, _orianna.Team, _orianna.SkinID, true, false);
             _oriannaBall.FaceDirection(new Vector3(position.X, 0, position.Y));
-            _ballBuff = AddBuff("OriannaBall", 2300.0f, 1, _spell, _oriannaBall, _orianna).BuffScript as OriannaBall;
-            SetStateRendered(renderState);
-            SetStateFlying(false);
+            _oriannaBallBuff = AddBuff("OriannaBall", 2300.0f, 1, _spell, _oriannaBall, _orianna).BuffScript as OriannaBall;
+
+            ChangeState(BallState.DISABLED);
+
+            if(renderState)
+            {
+                SetStateRendered(true);
+            }
 
             return _oriannaBall;
         }
 
         /// <summary>
-        /// Disables the Ball state and attaches it back to Orianna unless
+        /// Destorys the current instance of Orianna Ball.
         /// </summary>
-        /// <param name="attachToChamp">If the ball should be attached to a new champ, defaults to Orianna if false</param>
-        /// <param name="champion">Champion to attach ball to once it is disabled.</param>
-        /// TODO: Possible better way to handle this rather than Active/Deactive locking other methods. Would prefer to not constantly destory and remake a ball instance if possible.
-        /// TODO: THink of better name for this method.
-        public void DisableOriannaBall(bool attachToChamp = false, IChampion champion = null)
+        public void DestoryBall()
         {
-            SetStateRendered(false);
-            SetStateAttached(true);
-            SetStateGrounded(false);
-            SetStateFlying(false);
+            ChangeState(BallState.DISABLED);
 
-            if (attachToChamp)
-            {
-                SetAttachedChampion(champion);
-            }
-            else
-            {
-                SetAttachedChampion(_orianna as IChampion);
-            }
-
-            //theBall.TakeDamage(theBall.Owner, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
+            _oriannaBall.TakeDamage(_orianna, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
+            _oriannaBall = null;
         }
 
         /// <summary>
-        /// Destorys the current instance of Orianna Ball.
+        /// Disables the all Ball States and clears Attached Champion & removes E Passive Buffs.
         /// </summary>
-        public void DestoryOriannaBall()
+        public void DisableBall()
         {
-            SetStatus(_oriannaBall, StatusFlags.NoRender, true);
-            SetStateRendered(false);
-            SetStateAttached(false);
-            SetStateGrounded(false);
-            SetStateFlying(false);
-            _oriannaBall.TakeDamage(_orianna, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
-            _oriannaBall = null;
+            ChangeState(BallState.DISABLED);
+            //theBall.TakeDamage(theBall.Owner, 10000f, DamageType.DAMAGE_TYPE_TRUE, DamageSource.DAMAGE_SOURCE_INTERNALRAW, DamageResultType.RESULT_NORMAL);
         }
 
         /// <summary>
         /// Teleports current instance of Orianna ball to the new position.
         /// </summary>
         /// <param name="newPosition">New position to move Orianna Ball to.</param>
-        /// <param name="activateBall">Usually enabled for Q. Sets Ball to active configuration.</param>
+        /// <param name="enableBall">Usually enabled for Q. Sets Ball to active configuration.</param>
         /// <returns>The new position of the ball.</returns>
-        public Vector2 TeleportOriannaBall(Vector2 newPosition, bool activateBall = false)
+        public Vector2 TeleportBall(Vector2 newPosition, bool enableBall = false)
         {
+            ChangeState(BallState.DISABLED);
+
             _oriannaBall.TeleportTo(newPosition.X, newPosition.Y);
 
-            if (activateBall)
+            if (enableBall)
             {
-                SetStateRendered(true);
-                SetStateGrounded(true);
-                SetAttachedChampion(null);
-                SetStateAttached(false);
+                ChangeState(BallState.GROUNDED);
             }
 
             return newPosition;
@@ -309,34 +319,131 @@ namespace Buffs
         /// <param name="newPosition">New position to place Orianna Ball at.</param>
         /// <param name="activateBall">Usually enabled for Q. Sets Ball to active configuration.</param>
         /// <returns>The new position of the ball.</returns>
-        public Vector2 DropOriannaBall()
+        public Vector2 DropBall()
         {
             _oriannaBall.TeleportTo(GetAttachedChampion().Position.X, GetAttachedChampion().Position.Y);
             var droppedPosition = new Vector2(GetAttachedChampion().Position.X, GetAttachedChampion().Position.Y);
 
-            SetStateRendered(true);
-            SetStateGrounded(true);
-            SetAttachedChampion(null);
-            SetStateAttached(false);
+            ChangeState(BallState.GROUNDED);
 
             return droppedPosition;
         }
 
         /// <summary>
-        /// Casts the spell OrianaReturn.
+        /// Attaches Ball to Champion and sets relevant states and removes Buffs.
         /// </summary>
-        public void ReturnOriannaBall()
+        /// <param name="champion">Champion to attach the ball too./param>
+        /// <returns>Champion the ball will be attached to.</returns>
+        public IChampion AttachToChampion(IChampion champion)
         {
-            SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, false, _oriannaBall, Vector2.Zero);
+            RemoveEBuff();
+
+            ChangeState(BallState.ATTACHED);
+            SetAttachedChampion(champion);
+
+            return champion;
         }
 
         /// <summary>
-        /// Returns the current instance of a Orianna Ball.
+        /// Handles bulk stat changing actions.
         /// </summary>
-        /// <returns>Current instance of Orianna Ball</returns>
-        public IMinion GetOriannaBall()
+        public void ChangeState(BallState newState)
         {
-            return _oriannaBall;
+            if (_currentState == newState)
+            {
+                return;
+            }
+
+            if (newState == BallState.DISABLED)
+            {
+                RemoveEBuff();
+
+                SetAttachedChampion(null);
+
+                SetStateFlying(false);
+                SetStateGrounded(false);
+                SetStateAttached(false);
+                SetStatePickupable(false);
+                SetStateRendered(false);
+            }
+
+            if (newState == BallState.ATTACHED)
+            {
+                SetStateFlying(false);
+                SetStateGrounded(false);
+                SetStateAttached(true);
+                SetStatePickupable(false);
+                SetStateRendered(false);
+            }
+
+            if (newState == BallState.GROUNDED)
+            {
+                RemoveEBuff();
+
+                SetAttachedChampion(null);
+
+                SetStateFlying(false);
+                SetStateGrounded(true);
+                SetStateAttached(false);
+                SetStatePickupable(true);
+                SetStateRendered(true);
+            }
+
+            if (newState == BallState.FLYING)
+            {
+                RemoveEBuff();
+
+                SetStateFlying(true);
+                SetStateGrounded(false);
+                SetStateAttached(false);
+                SetStatePickupable(false);
+                SetStateRendered(false);
+            }
+
+            _currentState = newState;
+        }
+
+        /// <summary>
+        /// Adds Orianna E Passive Buff to target
+        /// </summary>
+        public void AddEBuff(IAttackableUnit target, ISpell spell)
+        {
+            if (target == _orianna)
+            {
+                AddBuff("OrianaGhost", 1.0f, 1, spell, target, _orianna, true);
+            }
+            else
+            {
+                AddBuff("OrianaGhostSelf", 1.0f, 1, spell, target, _orianna, true);
+            }
+        }
+
+        /// <summary>
+        /// Removes Orianna E Passive Buff from currently attached champion.
+        /// </summary>
+        public void RemoveEBuff()
+        {
+            if (_attachedChampion != null)
+            {
+                GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
+                GetAttachedChampion().RemoveBuffsWithName("OrianaGhostSelf");
+            }
+        }
+
+        #endregion
+
+
+        #region SpellCastMethods
+
+        /// <summary>
+        /// Casts the spell OrianaReturn.
+        /// </summary>
+        public void ReturnBall(bool fireWithoutCasting = false)
+        {
+            if (CanBePickedUp)
+            {
+                SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, fireWithoutCasting, _oriannaBall, Vector2.Zero);
+            }
         }
 
         /// <summary>
@@ -344,7 +451,7 @@ namespace Buffs
         /// </summary>
         /// <param name="spell">Spell which triggered this ball will cast.</param>
         /// TODO: Test this Q,W,E,R
-        public void BallCast(ISpell spell)
+        public void CastSpellFromBall(ISpell spell)
         {
             var slot = spell.CastInfo.SpellSlot;
             if (slot != 1 || slot != 3 && _oriannaBall != null)

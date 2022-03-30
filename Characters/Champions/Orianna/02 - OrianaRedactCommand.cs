@@ -17,14 +17,11 @@ using GameServerCore.Domain.GameObjects.Spell.Missile;
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/25/2022
+ * Lastupdated: 3/30/2022
  * 
  * TODOS:
- * Implement Spell Locking on Q, W, E, and R 
- * Should I bother locking E? if the spell goes on CD you can't use it anyway.
- * Might be best to lock all spells while ball is in flight anyway to prevent edge case breaking.
- * Wait for LeagueSandbox GamerServer to implement Stealth to hide E particle. Wil be implemented in OrianaGhost, possible Stealth API listner?
- * Implement Windwall Interactions
+ * Wait for LeagueSandbox GamerServer to implement Stealth to hide E particle. Wil be implemented in OrianaGhost.
+ * Implement Windwall Interactions. Might need to make DropBallOnBlock method in Ball handler.
  * 
  * ==OrianaRedactCommand==
  * 
@@ -63,7 +60,7 @@ namespace Spells
 
             if(_ballHandler.GetStateAttached())
             {
-                if (_ballHandler.GetAttachedChampion() == (IChampion) _orianna) 
+                if (_ballHandler.GetAttachedChampion() == (_orianna as IChampion)) 
                 {
                     AddBuff("OrianaGhostSelf", 1.0f, 1, spell, _ballHandler.GetAttachedChampion(), _orianna, true);
                 }
@@ -82,42 +79,28 @@ namespace Spells
         {
             _ballHandler = (_orianna.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
 
+            if (_orianna.Model == "Orianna")
+            {
+                _orianna.ChangeModel("OriannaNoBall");
+            }
+
+            _orianna.PlayAnimation("Spell2", 1f, 0, 0);
+
             if (_ballHandler.GetStateAttached())
             {
-                if (_ballHandler.GetAttachedChampion() == (IChampion) _orianna)
+                if (_ballHandler.GetAttachedChampion() == (target as IChampion))
                 {
-                    if((IChampion) target == (IChampion) _orianna)
-                    {
-                        AddBuff("OrianaRedactShield", 2.5f, 1, spell, _orianna, _orianna);
-                    }
-                    else 
-                    {
-                        SpellCast(_orianna, 2, SpellSlotType.ExtraSlots, target.Position, target.Position, false, _orianna.Position, spell.CastInfo.Targets, overrideForceLevel: spell.CastInfo.SpellLevel);
-
-                        if (_orianna.Model == "Orianna")
-                        {
-                            _orianna.ChangeModel("OriannaNoBall");
-                        }
-                    }
+                    AddBuff("OrianaRedactShield", 4f, 1, spell, target, _orianna);
                 }
                 else
                 {
-                    if ((IChampion)target == _ballHandler.GetAttachedChampion())
-                    {
-                        AddBuff("OrianaRedactShield", 2.5f, 1, spell, _ballHandler.GetAttachedChampion(), _orianna);
-                    }
-                    else
-                    {
-                        SpellCast(owner, 2, SpellSlotType.ExtraSlots, target.Position, target.Position, false, _ballHandler.GetAttachedChampion().Position, spell.CastInfo.Targets, overrideForceLevel: spell.CastInfo.SpellLevel);
-                    }
+                    SpellCast(owner, 2, SpellSlotType.ExtraSlots, target.Position, target.Position, false, _ballHandler.GetAttachedChampion().Position, spell.CastInfo.Targets, overrideForceLevel: spell.CastInfo.SpellLevel);
                 }
             }
             else
             {
-                SpellCast(owner, 2, SpellSlotType.ExtraSlots, target.Position, target.Position, false, _ballHandler.GetOriannaBall().Position, spell.CastInfo.Targets, overrideForceLevel: spell.CastInfo.SpellLevel);  
+                SpellCast(owner, 2, SpellSlotType.ExtraSlots, target.Position, target.Position, false, _ballHandler.GetBall().Position, spell.CastInfo.Targets, overrideForceLevel: spell.CastInfo.SpellLevel);
             }
-
-            _orianna.PlayAnimation("Spell2", 1f, 0, 0);
         }
 
         public void OnSpellCast(ISpell spell)
@@ -128,13 +111,9 @@ namespace Spells
         {
             if(!_disableSpellCosts)
             {
-                spell.SetCooldown(9, false);
+                spell.SetCooldown(9);
                 _orianna.Stats.CurrentMana -= 60;
             }
-        }
-
-        public void ApplyEffects(IObjAiBase owner, IAttackableUnit target, ISpell spell, ISpellMissile missile)
-        {
         }
 
         public void OnSpellChannel(ISpell spell)
@@ -150,8 +129,7 @@ namespace Spells
         }
 
         public void OnUpdate(float diff)
-        {
-            
+        { 
         }
     }
 
@@ -181,19 +159,15 @@ namespace Spells
 
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
-            DisableAbilityCheck();
-
             _ballHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
 
-            _target = (IChampion)spell.CastInfo.Targets[0].Unit;
+            DisableAbilityCheck();
 
-            if (_ballHandler.GetAttachedChampion() != null)
-            {
-                _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
-                _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhostSelf");
-            }
+            _target = (spell.CastInfo.Targets[0].Unit as IChampion);
 
-            _ballHandler.SetStateFlying(true);
+            _ballHandler.RemoveEBuff();
+
+            _ballHandler.ChangeState(Buffs.OriannaBallHandler.BallState.FLYING);
 
             var missile = spell.CreateSpellMissile(new MissileParameters
             {
@@ -208,30 +182,28 @@ namespace Spells
         {
             if (target.Team != _orianna.Team)
             {
-                if (missile is ISpellCircleMissile skillshot)
-                {
-                    var owner = spell.CastInfo.Owner;
-                    var spellLevel = spell.CastInfo.SpellLevel - 1;
-                    var baseDamage = new[] { 60, 90, 120, 150, 180 }[spellLevel];
-                    var magicDamage = owner.Stats.AbilityPower.Total * .3f;
-                    var damage = baseDamage + magicDamage;
-                    //Shares target hit partixcle with Orianna Q: OrianaIzuna
-                    AddParticleTarget(_orianna, target, "OrianaIzuna_tar", target, 1f, teamOnly: _orianna.Team, bone: "pelvis", targetBone: "pelvis");
-                    target.TakeDamage(owner, damage, DamageType.DAMAGE_TYPE_MAGICAL, DamageSource.DAMAGE_SOURCE_SPELL, false);
-                }
+                //if (missile is ISpellCircleMissile skillshot)
+                var owner = spell.CastInfo.Owner;
+                var spellLevel = spell.CastInfo.SpellLevel - 1;
+                var baseDamage = new[] { 60, 90, 120, 150, 180 }[spellLevel];
+                var magicDamage = owner.Stats.AbilityPower.Total * .3f;
+                var damage = baseDamage + magicDamage;
+                //Shares target hit partixcle with Orianna Q: OrianaIzuna
+                AddParticleTarget(_orianna, target, "OrianaIzuna_tar", target, 1f, teamOnly: _orianna.Team, bone: "pelvis", targetBone: "pelvis");
+                target.TakeDamage(owner, damage, DamageType.DAMAGE_TYPE_MAGICAL, DamageSource.DAMAGE_SOURCE_SPELL, false);    
             }
         }
 
         public void OnMissileFinish(ISpellMissile missile)
         {
-            _ballHandler.SetStateFlying(false);
-            
+            _ballHandler.ChangeState(Buffs.OriannaBallHandler.BallState.ATTACHED);
 
             if (_target.IsDead || !_target.GetIsTargetableToTeam(_orianna.Team))
             {
-                _ballHandler.DisableOriannaBall(true, (IChampion) _orianna);
-
-                AddBuff("OrianaGhostSelf", 1f, 1, missile.SpellOrigin, _orianna, _orianna, true);
+                //_ballHandler.DisableBall();
+                //_ballHandler.AttachToChampion((IChampion)_orianna);
+                //Need to PlayTest this to ensure it works as intended
+                SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, true, _orianna, Vector2.Zero);
 
                 if (_orianna.Model == "OriannaNoBall")
                 {
@@ -241,11 +213,13 @@ namespace Spells
                 return;
             }
 
-            _ballHandler.DisableOriannaBall(true, _target);
+            _ballHandler.DisableBall();
+            _ballHandler.AttachToChampion(_target);
+            _ballHandler.ChangeState(Buffs.OriannaBallHandler.BallState.ATTACHED);
 
             AddBuff("OrianaRedactShield", 4f, 1, missile.SpellOrigin, _target, _orianna);
 
-            if (_target == (IChampion)_orianna)
+            if (_target == (_orianna as IChampion))
             {
                 AddBuff("OrianaGhostSelf", 1f, 1, missile.SpellOrigin, _target, _orianna, true);
 
@@ -258,9 +232,6 @@ namespace Spells
             {
                 AddBuff("OrianaGhost", 1f, 1, missile.SpellOrigin, _target, _orianna, true);
             }
-
-            _ballHandler.SetAttachedChampion(_target);
-            _ballHandler.SetStateAttached(true);
 
             EnableAbilityCheck();
         }

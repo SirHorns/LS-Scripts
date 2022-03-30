@@ -16,26 +16,26 @@ using static LeagueSandbox.GameServer.API.ApiFunctionManager;
 //*=========================================
 /*
  * ValkyrieHorns
- * Lastupdated: 3/25/2022
+ * Lastupdated: 3/30/2022
  * 
  * TODOS:
- * Implement Spell Lockin on Q and E
- * Implement Windwall Interactions
+ * Implement Windwall Interactions. Might need to make DropBallOnBlock method in Ball handler.
+ * Implement minimum travel distance away from orianna if ball is attached to her.
  * 
  * ==OrianaIzunaCommand==
  * Create better model Change method.
  * Determine if there is better animation handling.
  * 
  *= =OrianaIzuna==
- * Figure out how oriana_ball_glow_[green/red].troy was displayed in patch 4.20 on Live Servers it arounds the ball but I can't figure out which bone this is attached to on the ball. Look at bones in Blender?
+ * Figure out which bones in the ball that oriana_ball_glow_[green/red].troy are attached to. Look at bones in Blender?
  * Create better particle management
- * Spell Enable/Disable checks for Q & E
  * Spell Queueing for W & R. Might needs to handle this within the BallHandlerBuff
+ * Sector is not ceated at Ball landing location and does not apply damage.
  * 
  * Known Issues:
- * Sector for where the ball lands works but acts oddly, sometimes applies sometimes doesn't but the missile component goes through still. 
- * Unsure if its working properly or if I am misundersnting what is occuring
+ * If ball is launched to close to Orianna and pickupball it not triggered the ball slowl slides from her model to its position.
  * 
+ * Notes:
  * Appears that trying to pull the current cooldown of a spell from within said spell is breaking. Or maybe there is a better way to do it. 
  * Disabling CD check on Q & E for now and allowing the normal CD to keep code logic in check
 */
@@ -67,10 +67,18 @@ namespace Spells
         public void OnSpellPreCast(IObjAiBase owner, ISpell spell, IAttackableUnit target, Vector2 start, Vector2 end)
         {
             _ballHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
+
+            //Possible that this needs to replaced with a better system in the GameSever downt he line
+            if (_orianna.Model == "Orianna")
+            {
+                _orianna.ChangeModel("OriannaNoBall");
+            }
         }
         
         public void OnSpellCast(ISpell spell)
         {
+            _orianna.PlayAnimation("Spell1", 1f, 0, 0);
+
             //TODO: Determine if Orianna should walk in range and cast spell or leave it so that she just walks to the cast location if it casted out of her spell range.
             var spellPos = new Vector2(spell.CastInfo.TargetPosition.X, spell.CastInfo.TargetPosition.Z);
 
@@ -81,18 +89,8 @@ namespace Spells
             }
             else
             {
-                SpellCast(_orianna, 0, SpellSlotType.ExtraSlots, spellPos, spellPos, false, _ballHandler.GetOriannaBall().Position, overrideForceLevel: spell.CastInfo.SpellLevel);
+                SpellCast(_orianna, 0, SpellSlotType.ExtraSlots, spellPos, spellPos, false, _ballHandler.GetBall().Position, overrideForceLevel: spell.CastInfo.SpellLevel);
             }
-
-            //TODO: Think of better way of handling Orianna Model Changing between spells.
-            //Maybe use a internal buff to keep track of overall model state instead of setting it within individual spells.
-            if (_orianna.Model == "Orianna")
-            {
-                _orianna.ChangeModel("OriannaNoBall");
-            }
-
-            //TODO: Clean up animation. Slight sliding as animtion fully plays while moving. Spell does not stop Orianna's Movement commands.
-            _orianna.PlayAnimation("Spell1", 1f, 0, 0);
         }
 
         public void OnSpellPostCast(ISpell spell)
@@ -154,6 +152,8 @@ namespace Spells
             _spellPos = new Vector2(spell.CastInfo.TargetPosition.X, spell.CastInfo.TargetPosition.Z);
             _ballHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
             DisableAbilityCheck();
+
+            _ballHandler.RemoveEBuff();
         }
 
         public void OnSpellCast(ISpell spell)
@@ -162,38 +162,26 @@ namespace Spells
 
         public void OnSpellPostCast(ISpell spell)
         {
-            var ballPos = _ballHandler.GetOriannaBall().Position;
+            var ballPos = _ballHandler.GetBall().Position;
+
             if (ballPos == _spellPos)
             {
-                CreateDamageSector();
+                CreateDamageSector(spell);
+                _damageSector.SetToRemove();
                 AddParticlePos(_orianna, "Oriana_Izuna_nova", ballPos, ballPos, 1f, bone: "BUFFBONE_CSTM_WEAPONA");
+                _ballHandler.ChangeState(Buffs.OriannaBallHandler.BallState.GROUNDED);
             }
             else
             {
-                if(_ballHandler.GetStateAttached())
-                {
-                    _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
-                    _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhostSelf");
-                }
-                
-
-                _ballHandler.SetStateFlying(true);
-
+                _ballHandler.ChangeState(Buffs.OriannaBallHandler.BallState.FLYING);
 
                 _missile = spell.CreateSpellMissile(new MissileParameters
                 {
                     Type = MissileType.Circle,
                     OverrideEndPosition = _spellPos,
                 });
+
                 ApiEventManager.OnSpellMissileEnd.AddListener(this, _missile, OnMissileFinish, true);
-
-                _ballHandler.SetStateRendered(false);
-
-                if (_ballHandler.GetAttachedChampion() != null)
-                {
-                    _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhost");
-                    _ballHandler.GetAttachedChampion().RemoveBuffsWithName("OrianaGhostSef");
-                }
             }
         }
 
@@ -201,29 +189,43 @@ namespace Spells
         private List<IAttackableUnit> _targetsHit = new List<IAttackableUnit>();
         public void TargetExecute(ISpell spell, IAttackableUnit target, ISpellMissile missile, ISpellSector sector)
         {
-            if (!_targetsHit.Contains(target)) 
+            if(_targetsHit.Contains(target))
             {
-                _targetHitCount++;
+                return;
+            }
 
-                var owner = spell.CastInfo.Owner;
-                var spellLevel = spell.CastInfo.SpellLevel - 1;
-                var baseDamage = new[] { 60, 90, 120, 150, 180 }[spellLevel];
-                var magicDamage = owner.Stats.AbilityPower.Total * .5f;
-                var damage = baseDamage + magicDamage;
+            var owner = spell.CastInfo.Owner;
+            var spellLevel = spell.CastInfo.SpellLevel - 1;
+            var baseDamage = new[] { 60, 90, 120, 150, 180 }[spellLevel];
+            var magicDamage = owner.Stats.AbilityPower.Total * .5f;
+            var damage = baseDamage + magicDamage;
 
-                var reductionAmount = 0;
-                if (_targetHitCount >= 7)
-                {
-                    reductionAmount = 7;
-                }
-                else
-                {
-                    reductionAmount = _targetHitCount;
-                }
+            int reductionAmount;
+            if (_targetHitCount >= 7)
+            {
+                reductionAmount = 7;
+            }
+            else
+            {
+                reductionAmount = _targetHitCount;
+            }
+
+            _targetHitCount++;
+            _targetsHit.Add(target);
+
+            if (missile == _missile)
+            {
                 var finalDamage = damage * (1.10f - (.1f * reductionAmount));
                 AddParticleTarget(_orianna, target, "OrianaIzuna_tar", target, 1f, teamOnly: _orianna.Team, bone: "pelvis", targetBone: "pelvis");
                 target.TakeDamage(owner, finalDamage, DamageType.DAMAGE_TYPE_MAGICAL, DamageSource.DAMAGE_SOURCE_SPELL, false);
-                _targetsHit.Add(target);
+                return;
+            }
+
+            if(sector == _damageSector)
+            {
+                var finalDamage = damage * (1.10f - (.1f * reductionAmount));
+                AddParticleTarget(_orianna, target, "OrianaIzuna_tar", target, 1f, teamOnly: _orianna.Team, bone: "pelvis", targetBone: "pelvis");
+                target.TakeDamage(owner, finalDamage, DamageType.DAMAGE_TYPE_MAGICAL, DamageSource.DAMAGE_SOURCE_SPELL, false);
             }
         }
 
@@ -231,20 +233,13 @@ namespace Spells
         IParticle enemyMarker;
         public void OnMissileFinish(ISpellMissile missile)
         {
-            var paritclePos = _ballHandler.TeleportOriannaBall(_spellPos, true);
+            var paritclePos = _ballHandler.TeleportBall(_spellPos, true);
 
-            _ballHandler.SetStateFlying(false);
+            _ballHandler.ChangeState(Buffs.OriannaBallHandler.BallState.GROUNDED);
 
             AddParticlePos(_orianna, "Oriana_Izuna_nova", paritclePos, paritclePos, 1f, bone: "BUFFBONE_CSTM_WEAPONA");
 
-            _damageSector = missile.SpellOrigin.CreateSpellSector(new SectorParameters
-            {
-                Length = 175,
-                SingleTick = true,
-                OverrideFlags = SpellDataFlags.AffectEnemies | SpellDataFlags.AffectNeutral | SpellDataFlags.AffectMinions | SpellDataFlags.AffectHeroes,
-                BindObject = _ballHandler.GetOriannaBall(),
-                Type = SectorType.Area,
-            });
+            CreateDamageSector(missile.SpellOrigin);
 
             _targetHitCount = 0;
 
@@ -263,15 +258,15 @@ namespace Spells
             //TODO: Better particle management.
             if (enemyMarker == null || allyMarker == null)
             {
-                allyMarker = AddParticleTarget(_orianna, _ballHandler.GetOriannaBall(), "oriana_ball_glow_green", _ballHandler.GetOriannaBall(), 2300f, teamOnly: _orianna.Team, bone: "BUFFBONE_CSTM_WEAPONA");
-                enemyMarker = AddParticlePos(_orianna, "oriana_ball_glow_red", _ballHandler.GetOriannaBall().Position, _ballHandler.GetOriannaBall().Position, 2300f, teamOnly: enemyTeamId, bone: "BUFFBONE_CSTM_WEAPONA");
+                allyMarker = AddParticleTarget(_orianna, _ballHandler.GetBall(), "oriana_ball_glow_green", _ballHandler.GetBall(), 2300f, teamOnly: _orianna.Team, bone: "BUFFBONE_CSTM_WEAPONA");
+                enemyMarker = AddParticlePos(_orianna, "oriana_ball_glow_red", _ballHandler.GetBall().Position, _ballHandler.GetBall().Position, 2300f, teamOnly: enemyTeamId, bone: "BUFFBONE_CSTM_WEAPONA");
             }
             else
             {
                 //allyMarker.SetToRemove();
                 enemyMarker.SetToRemove();
                 //allyMarker = AddParticlePos(_owner, "oriana_ball_glow_green.troy", BallHandler.GetBall().Position, BallHandler.GetBall().Position, 2300f, teamOnly: _owner.Team, bone: "BUFFBONE_CSTM_WEAPONA");
-                enemyMarker = AddParticlePos(_orianna, "oriana_ball_glow_red", _ballHandler.GetOriannaBall().Position, _ballHandler.GetOriannaBall().Position, 2300f, teamOnly: enemyTeamId, bone: "BUFFBONE_CSTM_WEAPONA");
+                enemyMarker = AddParticlePos(_orianna, "oriana_ball_glow_red", _ballHandler.GetBall().Position, _ballHandler.GetBall().Position, 2300f, teamOnly: enemyTeamId, bone: "BUFFBONE_CSTM_WEAPONA");
             }
             _damageSector.SetToRemove();
             _targetsHit.Clear();
@@ -279,15 +274,18 @@ namespace Spells
             EnableAbilityCheck();
         }
 
-        private void CreateDamageSector()
+        private void CreateDamageSector(ISpell spell)
         {
-
-            _damageSector = _spell.CreateSpellSector(new SectorParameters
+            _damageSector = spell.CreateSpellSector(new SectorParameters
             {
-                Length = 200,
-                OverrideFlags = SpellDataFlags.AffectEnemies | SpellDataFlags.AffectNeutral | SpellDataFlags.AffectMinions | SpellDataFlags.AffectHeroes,
-                BindObject = _ballHandler.GetOriannaBall(),
+                Length = 175,
+                SingleTick = true,
+                Tickrate = 6,
+                OverrideFlags = SpellDataFlags.InstantCast | SpellDataFlags.AffectEnemies | SpellDataFlags.AffectNeutral | SpellDataFlags.AffectMinions | SpellDataFlags.AffectHeroes,
+                BindObject = _ballHandler.GetBall(),
                 Type = SectorType.Area,
+                CanHitSameTarget = false,
+                CanHitSameTargetConsecutively = false,
             });
         }
 

@@ -36,15 +36,8 @@ namespace CharScripts
             _spell = spell;
 
             _ballHandler = AddBuff("OriannaBallHandler", 1.0f, 1, spell, owner, owner, true).BuffScript as Buffs.OriannaBallHandler;
-            _ballHandler.SetAttachedChampion((IChampion)owner);
 
             AddBuff("ClockworkWinding", 1f, 1, spell, owner, owner, true);
-            ApiEventManager.OnDeath.AddListener(owner, owner, OnDeath, false);
-        }
-
-        private void OnDeath(IDeathData death)
-        {
-            _ballHandler.DisableOriannaBall();
         }
 
         public void OnDeactivate(IObjAiBase owner, ISpell spell = null)
@@ -53,7 +46,6 @@ namespace CharScripts
 
         public void OnUpdate(float diff)
         {
- 
         }
     }
 
