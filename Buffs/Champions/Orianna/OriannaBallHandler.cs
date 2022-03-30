@@ -62,7 +62,7 @@ namespace Buffs
         private bool IsGrounded = false;
         private bool IsAttached = true;
         private bool IsRendered = false;
-        private bool CanBePickedUp = false;
+        private bool CanBeReturned = false;
 
         public void OnActivate(IAttackableUnit unit, IBuff buff, ISpell ownerSpell)
         {
@@ -101,9 +101,9 @@ namespace Buffs
         /// Returns current pickable state
         /// </summary>
         /// <returns>Pickupable state.</returns>
-        public bool SetStatePickupable()
+        public bool GetStateReturnable()
         {
-            return this.CanBePickedUp;
+            return this.CanBeReturned;
         }
 
         /// <summary>
@@ -151,9 +151,9 @@ namespace Buffs
         /// </summary>
         /// <param name="pickupable">Sets if the ball can be picked up</param>
         /// <returns>Pickupable state.</returns>
-        public bool SetStatePickupable(bool pickupable)
+        public bool SetStateReturnable(bool pickupable)
         {
-            return CanBePickedUp = pickupable;
+            return CanBeReturned = pickupable;
         }
 
         /// <summary>
@@ -363,7 +363,7 @@ namespace Buffs
                 SetStateFlying(false);
                 SetStateGrounded(false);
                 SetStateAttached(false);
-                SetStatePickupable(false);
+                SetStateReturnable(false);
                 SetStateRendered(false);
             }
 
@@ -372,7 +372,7 @@ namespace Buffs
                 SetStateFlying(false);
                 SetStateGrounded(false);
                 SetStateAttached(true);
-                SetStatePickupable(false);
+                SetStateReturnable(true);
                 SetStateRendered(false);
             }
 
@@ -385,7 +385,7 @@ namespace Buffs
                 SetStateFlying(false);
                 SetStateGrounded(true);
                 SetStateAttached(false);
-                SetStatePickupable(true);
+                SetStateReturnable(true);
                 SetStateRendered(true);
             }
 
@@ -396,7 +396,7 @@ namespace Buffs
                 SetStateFlying(true);
                 SetStateGrounded(false);
                 SetStateAttached(false);
-                SetStatePickupable(false);
+                SetStateReturnable(false);
                 SetStateRendered(false);
             }
 
@@ -440,7 +440,7 @@ namespace Buffs
         /// </summary>
         public void ReturnBall(bool fireWithoutCasting = false)
         {
-            if (CanBePickedUp)
+            if (CanBeReturned)
             {
                 SpellCast(_orianna, 4, SpellSlotType.ExtraSlots, fireWithoutCasting, _oriannaBall, Vector2.Zero);
             }

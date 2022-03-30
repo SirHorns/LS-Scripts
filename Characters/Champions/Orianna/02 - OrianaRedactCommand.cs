@@ -30,6 +30,7 @@ using GameServerCore.Domain.GameObjects.Spell.Missile;
  * Known Issues:
  * Appears that trying to pull the current cooldown of a spell from within said spell is breaking. Or maybe there is a better way to do it. 
  * Disabling CD check on Q & E for now and allowing the normal CD to keep code logic in check
+ * Spell cooldown needs to be definitaly stated to not ignore CDR or it just locks to 9s cd period
  * 
 */
 //*========================================
@@ -39,7 +40,7 @@ namespace Spells
     public class OrianaRedactCommand : ISpellScript
     {
         //USED FOR DEBUGING
-        bool _disableSpellCosts = true;
+        bool _disableSpellCosts = false;
 
         public ISpellScriptMetadata ScriptMetadata { get; private set; } = new SpellScriptMetadata()
         {
@@ -111,7 +112,7 @@ namespace Spells
         {
             if(!_disableSpellCosts)
             {
-                spell.SetCooldown(9);
+                spell.SetCooldown(9.0f, false);
                 _orianna.Stats.CurrentMana -= 60;
             }
         }

@@ -23,6 +23,7 @@ using GameServerCore.Domain.GameObjects.Spell.Missile;
  * Uses a placeholder particle for now.
  * 
  * Known Issues:
+ * Spell cooldown needs to be definitaly stated to not ignore CDR or it just locks to 9s cd period
 */
 //*========================================
 
@@ -31,7 +32,7 @@ namespace Spells
     public class OrianaDissonanceCommand : ISpellScript
     {
         //USED FOR DEBUGING
-        bool _disableSpellCosts = true;
+        bool _disableSpellCosts = false;
 
         public ISpellScriptMetadata ScriptMetadata { get; private set; } = new SpellScriptMetadata()
         {
@@ -186,7 +187,7 @@ namespace Spells
         {
             if (!_disableSpellCosts)
             {
-                _spell.SetCooldown(9.0f);
+                _spell.SetCooldown(9.0f,false);
 
                 var manaCost = new[] { 70, 80, 90, 100, 110 }[_spell.CastInfo.SpellLevel - 1];
                 _orianna.Stats.CurrentMana -= manaCost;

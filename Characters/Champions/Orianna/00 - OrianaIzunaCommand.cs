@@ -46,7 +46,7 @@ namespace Spells
     public class OrianaIzunaCommand : ISpellScript
     {
         //USED FOR DEBUGING
-        bool _disableSpellCosts = true;
+        bool _disableSpellCosts = false;
 
         public ISpellScriptMetadata ScriptMetadata => new SpellScriptMetadata()
         {
@@ -69,7 +69,7 @@ namespace Spells
             _ballHandler = (owner.GetBuffWithName("OriannaBallHandler").BuffScript as Buffs.OriannaBallHandler);
 
             //Possible that this needs to replaced with a better system in the GameSever downt he line
-            if (_orianna.Model == "Orianna")
+            if (_orianna.Model== "Orianna")
             {
                 _orianna.ChangeModel("OriannaNoBall");
             }
