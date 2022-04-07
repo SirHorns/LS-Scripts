@@ -1,0 +1,38 @@
+ADD BUFF
+
+    #Check if Parents buff contains buff
+        Check if unit has buff
+            TRUE: 
+                store buff
+                set buff to new buffs Parent
+                return
+
+    #Replace Existing
+        remove any existig buffs of same name & store buff
+        force run DEACIVATE on removed buff
+        clear the new buff slot
+        set new buff to old buff's slot
+        set buff as the new parent buff
+        update client count if buff is not hidden
+        force run activate buff
+
+    #Renew Existing
+        clear the new buff slot
+        Reset existig buff elapsted time
+        update client count if buff is not hidden
+
+    #Stacks and continues
+        Check if unit has reached buff cap
+            True:
+                reset buff timer
+                update client visuals if not hiddent
+                    if Counter buff
+                        UpdateNumCounter
+                    else
+                        UpdateCount
+            return
+        incrament stack count
+        update client count if buff is not hidden
+
+    #
+REMOVE BUFF

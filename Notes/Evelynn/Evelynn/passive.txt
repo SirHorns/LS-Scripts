@@ -1,0 +1,49 @@
+EvelynnPassive - ShadowWalkRevealedDebuff, ShadowWalk, EvelynnHateSpikeMarker (unknown)
+ShadowWalkRevealedDebuff - ShadowWalkRestealthFadeout
+ShadowWalk - EvelynnWarning, EvelynnStealthMarker, EvelynnStealthRing, ShadowWalkRevealedWarning, EvelynnStealth
+EvelynnWarning - ShadowWalkRevealedWarning
+EvelynnStealthMarker - EvelynnStealthMana
+EvelynnStealthRing - ShadowWalkRevealedWarning
+EvelynnStealth - ShadowWalkRevealedWarning
+
+ShadowWalkRevealedDebuff - evelyn_invis_exit_cas.troy
+ShadowWalkRestealthFadout - evelyn_invis_cas.troy
+EvelynnWarning - evelynn_redeye.troy, evelynn_yelloweye.troy
+ShadowWalkRevealedWarning - evelynn-yikes.troy
+EvelynnStealthMana - evelynnmana.troy
+EvelynnStealthRing - evelynn_ring_green.troy
+
+
+Evelynn Passive Parts:
+Buffs:
+Camo
+Mana Regen
+Ghost Walking
+
+Debuffs: 
+Disabled Passive
+
+Mechnical:
+Stealth Trigger
+DeStealth Trigger
+Detection Radius
+Detection Warnings
+Animation Change
+
+
+
+Passive Shadow Walk
+Self-targeted buff
+Buffs:
+camo - out-combat 
+mana-regen - 2% every second
+ghosted - ignore unit collision
+
+Debuffs:
+Disable Shadow-walk - in-combat/use ability 6/5/4/3s level before re-enter
+
+Components:
+Detection Radius - 700-units display ring
+Detection warning - yellow/red eye
+Stealth Smoke puff
+
